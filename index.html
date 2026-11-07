@@ -141,6 +141,8 @@ footer ul{margin:6px 0 0;padding-left:18px}
     <a href="#recettes">Recettes</a>
     <a href="#jeux">Les 1000 jeux</a>
     <a href="#idees">Idées de jeux</a>
+    <a href="#mon-idee">Mon idée</a>
+    <a href="#plan">Plan de jeu</a>
   </div>
 </nav>
 
@@ -273,6 +275,23 @@ footer ul{margin:6px 0 0;padding-left:18px}
     <div class="src">Gardées dans ce navigateur seulement : elles ne passent pas de l'ordinateur au téléphone. Copie-les pour les garder ailleurs.</div>
   </div>
 </section>
+
+<section class="view" id="v-mon-idee">
+  <div class="grid" style="gap:8px"><h2>Noter mon idée</h2>
+  <p class="lede">Décris ton idée de jeu comme tu veux, en français ou en anglais. Le site la compare aux 1000 jeux du top, lui donne une note et te dit comment l'améliorer.</p></div>
+  <div class="card">
+    <label for="myText" class="src" style="font-weight:600">Ton idée</label>
+    <textarea id="myText" placeholder="Ex. : Un jeu où tu fais grandir un dragon en lui lançant de la nourriture, et les autres joueurs peuvent voler tes œufs de dragon la nuit. Il y a des échanges et un événement de Noël."></textarea>
+    <div class="controls"><button class="primary" id="myGo">Noter mon idée</button><span class="src">Plus tu donnes de détails (ce que fait le joueur, le thème, ce qui est différent), plus l'analyse est précise.</span></div>
+  </div>
+  <div id="myOut" class="grid"></div>
+</section>
+
+<section class="view" id="v-plan">
+  <div class="grid" style="gap:8px"><h2>Plan de jeu</h2>
+  <p class="lede">Tout ce qu'il faut pour fabriquer l'idée choisie, découpé par agent. Chaque agent a son prompt prêt à copier, qui contient déjà le brief complet du jeu.</p></div>
+  <div id="planOut" class="grid"></div>
+</section>
 </main>
 
 <footer class="wrap">
@@ -374,6 +393,7 @@ async function load(manual){
   const lv=$("#live");lv.hidden=false;lv.className="live"+(mins>150?" old":"");lv.textContent=mins<2?"à l'instant":mins<60?`il y a ${mins} min`:`il y a ${Math.round(mins/60)} h`;
   $("#loading").hidden=true;b.disabled=false;b.textContent="Actualiser";
   route();
+  if(window.LABO_AFTER_LOAD)window.LABO_AFTER_LOAD();
 }
 $("#reload").onclick=()=>load(true);
 
@@ -543,7 +563,7 @@ function makeIdea(){
   const loop=pick(pool,l=>(l.newShare+.1)*(l.med/maxMed+.2)*(1.2-l.n/maxN));
   const genre=gf&&gs[gf]?gf:(()=>{const c={};G.filter(g=>g.loops.includes(loop.k)&&gs[g.g]).forEach(g=>c[g.g]=(c[g.g]||0)+g.p);return Object.entries(c).sort((a,b)=>b[1]-a[1])[0]?.[0]||loop.genre})();
   const th=tf?A.themes.find(t=>t.k===tf):pick(A.themes.filter(t=>t.n>=1||THEMES[t.k]===THEMES.noel),t=>Math.pow(t.lift,1.5)+(t.k=="noel"&&nextSeason().name=="Noël"?1.5:0));
-  const T=THEMES[th.k],noun=rnd(T.nouns),twist=rnd(TWISTS),title=rnd(LOOPS[loop.k].titles).replace("{N}",noun);
+  const T=THEMES[th.k],noun=rnd(T.nouns),twist=rnd(TWISTS),title=rnd(LOOPS[loop.k].titles).replace("{N}",noun).replace(/\b([Aa]) ([AEIOUaeiou])/g,"$1n $2");
   const gsx=gs[genre];
   const sGenre=gsx?Math.round(gsx.pot/100*30):12;
   const sLoop=Math.round(Math.min(1,(loop.newN/Math.max(...A.loops.map(l=>l.newN))))*25);
@@ -577,7 +597,8 @@ function ideaHTML(I,idx){
      <div class="src"><b>Modèle à étudier :</b> ${I.loop.ex.map(g=>`<a href="${gameUrl(g)}">${esc(g.tn)}</a>`).join(", ")}. <b>Attention :</b> ${esc(L.risk)}</div>
      <div class="src"><b>Timing :</b> ${seasonText()}</div>
    </div>
-   <div><button data-save="${idx}">Garder</button></div></article>`;
+   <div class="controls"><button data-save="${idx}">Garder</button><button data-info="${idx}">Info</button><button class="primary" data-choose="${idx}">Choisir</button></div>
+   <div id="info-${idx}"></div></article>`;
 }
 function showIdeas(list){CURRENT=list;$("#ideaOut").innerHTML=list.map(ideaHTML).join("")}
 function topIdeas(){const pool=[];for(let i=0;i<200;i++)pool.push(makeIdea());const seen=new Set();showIdeas(pool.sort((a,b)=>b.score-a.score).filter(x=>{if(seen.has(x.loop.k))return false;seen.add(x.loop.k);return true}).slice(0,5))}
@@ -591,11 +612,12 @@ $("#clearSaved").onclick=()=>{store.set("labo-ideas",[]);renderSaved()};
 
 /* ---------- STATIQUE + ROUTAGE ---------- */
 bars($("#searchCats"),[["Mots de genre",34],["Noms de jeux",28],["Verbes d'action",18],["Style / esthétique",12],["Pratique (codes…)",8]],{fmt:v=>v+" %",max:40});
-const VIEWS=["apercu","percees","genres","mots-cles","recettes","jeux","idees"];
+const VIEWS=["apercu","percees","genres","mots-cles","recettes","jeux","idees","mon-idee","plan"];
 function route(){if(!D)return;const h=location.hash.slice(1);const v=VIEWS.includes(h)?h:"apercu";VIEWS.forEach(x=>$("#v-"+x).classList.toggle("on",x===v));document.querySelectorAll("nav.tabs a").forEach(a=>{if(a.getAttribute("href")==="#"+v)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current")})}
 addEventListener("hashchange",()=>{route();scrollTo({top:0})});
 load();
 setInterval(()=>{if(document.visibilityState==="visible")load()},20*60*1000);
 </script>
+<script src="plan.js"></script>
 </body>
 </html>

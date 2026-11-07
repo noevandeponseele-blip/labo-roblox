@@ -1,0 +1,496 @@
+/* Labo des jeux Roblox — noter une idée, fiche « Info », plan de production multi-agents.
+   Utilise les variables globales du script principal : G, A, D, LOOPS, THEMES, TWISTS, GFR, gname, esc, fr, fmtK, pct, store, gameUrl, nextSeason, seasonText, dfmt, toks, clean. */
+
+/* ---------- Reconnaissance en français ---------- */
+const FR_LOOP={
+ steal:/vol(er|e|eur)?\b|piquer|d[ée]rob|braqu/i, stat:/\+1|vitesse|chaque seconde|chaque clic|cliquer|incr[ée]ment|rebirth|renaissance/i,
+ collect:/oeuf|pet\b|pets\b|collection|collectionn|rare|raret[ée]|mutation|jardin|pousser|graine|[ée]clo/i,
+ throwfeed:/lancer|nourrir|nourris|[ée]volu|grandir|faire grandir/i, rounds:/meurtr|sh[ée]rif|r[ôo]le|cache-cache|manche|imposteur|duel/i,
+ survive:/surviv|nuit|horreur|peur|[ée]chapp|fuir|s'enfuir/i, rp:/\brp\b|roleplay|jeu de r[ôo]le|ville|m[ée]tier|maison|vie de/i,
+ fashion:/habill|tenue|mode\b|style|d[ée]fil[ée]|maquill|avatar/i, build:/constru|b[âa]tir|fabriqu|assembl/i,
+ tycoon:/tycoon|magasin|vendre|entreprise|usine|restaurant|business|boutique/i, td:/tower defense|d[ée]fense|d[ée]fendre|vagues?\b/i,
+ arena:/combat|bagarre|ar[èe]ne|pouvoir|ragdoll|claque|frapper|battle/i, shooter:/\btir\b|tirer|arme|pistolet|fusil|guerre|sniper/i,
+ sport:/foot|basket|sport|course\b|ballon|karting|tennis|volley/i, obby:/obby|parcours|sauter|grimper|tour\b|plateforme/i,
+ fish:/p[êe]che|p[êe]cher|poisson|creuser|miner|mine\b/i
+};
+const FR_THEME={
+ animaux:/animal|animaux|chien|chat\b|chats\b|lapin|dino|ferme|capybara/i, oeufs:/oeuf/i,
+ horreur:/horreur|peur|fant[ôo]me|monstre|hant[ée]|tueur|cauchemar/i, brainrot:/brainrot|m[èe]me|skibidi/i,
+ anime:/anime|manga|ninja|[ée]p[ée]e|aura|d[ée]mon/i, cute:/mignon|kawaii|rose\b|princesse|doux/i,
+ nourriture:/nourriture|cuisine|burger|pizza|g[âa]teau|bonbon|fruit|citron|sushi/i, vehicules:/voiture|camion|avion|bateau|train\b|moto|fus[ée]e/i,
+ sport:/foot|basket|sport|ballon/i, armee:/arm[ée]e|guerre|soldat|tank/i, noel:/no[ëe]l|neige|hiver|p[èe]re no[ëe]l|cadeau|glace/i,
+ prison:/prison|police|policier|voleur|braquage|flic/i, espace:/espace|plan[èe]te|alien|fus[ée]e|lune|[ée]toile/i
+};
+const fixA=t=>t.replace(/\b([Aa]) ([AEIOUaeiou])/g,"$1n $2");
+const pitchOf=I=>I.text?I.text:`${LOOPS[I.loop.k].desc.replace(/\.$/,"")}, sur le thème « ${I.T.label.toLowerCase()} », avec ${I.twist}.`;
+const norm=s=>s.toLowerCase().replace(/œ/g,"oe").replace(/æ/g,"ae");
+
+/* ---------- Conception par recette ---------- */
+const LOOP_DESIGN={
+ steal:{core:["Le joueur récupère des objets qui apparaissent ou qui sont produits dans sa base","Les objets rapportent de l'argent chaque seconde tant qu'ils sont dans sa base","Il dépense l'argent pour améliorer sa base, sa vitesse et ses défenses","Il peut entrer chez les autres pour voler un objet et le ramener chez lui avant d'être touché","Les objets plus rares rapportent plus et attirent les voleurs"],
+  systems:["Bases personnelles (une par joueur, 6 à 8 joueurs par serveur)","Objets avec 6 raretés (Commun → Secret) et revenu par seconde","Vol : porter l'objet ralentit, le propriétaire peut le reprendre en touchant le voleur","Verrou de base temporaire (60 s) après achat ou rebirth","Rebirth : remise à zéro contre un multiplicateur permanent","Marché ou échanges entre joueurs (optionnel en v1)"],
+  zones:["Rangée de bases identiques autour d'une zone centrale","Tapis roulant ou point d'apparition central des objets","Boutique d'améliorations près du spawn","Zone de spawn protégée"],
+  ui:["Argent et revenu/seconde en haut","Bouton Verrouiller la base avec compte à rebours","Fiche d'objet (rareté, revenu)","Alerte « On te vole ! » avec flèche vers le voleur","Boutique et Rebirth"],
+  save:["Argent","Objets possédés et leur emplacement","Niveau d'améliorations","Nombre de rebirths"],
+  money:["Game pass x2 argent","Game pass vitesse +","Produit : verrou de base instantané","Produit : objet rare garanti (afficher clairement ce qu'on achète)"],
+  sfx:["Ramassage d'objet","Pièces qui tombent (revenu)","Alarme de vol","Verrou qui se ferme","Rebirth (montée magique)"],
+  first5:"Le joueur reçoit un objet gratuit, voit l'argent monter, achète sa première amélioration en moins d'une minute, puis voit un autre joueur voler et comprend qu'il peut faire pareil."},
+ stat:{core:["Le joueur gagne +1 à une stat (vitesse, saut, force) automatiquement ou en cliquant","La stat lui permet d'aller plus loin sur un parcours ou une piste","Plus loin = zones avec de meilleures récompenses","Il dépense les récompenses en multiplicateurs","Rebirth pour un bonus permanent"],
+  systems:["Stat principale qui monte chaque seconde (affichée en très grand)","Mondes ou zones débloqués à des paliers de stat","Multiplicateurs (pets, trails, boosts)","Rebirth avec multiplicateur permanent","Classement du serveur"],
+  zones:["Piste ou couloir très long avec portes de paliers","Zone de départ avec boutique","Chaque palier change de décor"],
+  ui:["Stat géante au centre-haut","Barre vers le prochain palier","Boutique de boosts","Bouton Rebirth","Classement"],
+  save:["Stat","Rebirths","Boosts achetés","Zone max atteinte"],
+  money:["Game pass x2 stat","Game pass auto-clic","Produit boost x3 pendant 15 min","Produit saut de zone"],
+  sfx:["Petit tick à chaque +1","Passage de palier","Rebirth","Vent / vitesse"],
+  first5:"Le chiffre monte dès la première seconde, le premier palier arrive en moins de 30 secondes et la première porte s'ouvre devant le joueur."},
+ collect:{core:["Le joueur obtient des œufs, graines ou boîtes avec la monnaie du jeu","Il les ouvre ou les fait pousser et obtient un objet d'une rareté aléatoire","Les objets lui rapportent de la monnaie ou des bonus","Des mutations rares rendent certains objets uniques","Il échange avec d'autres joueurs pour compléter sa collection"],
+  systems:["Table de raretés avec probabilités affichées","Mutations (doré, arc-en-ciel…) qui multiplient la valeur","Index de collection à compléter","Échanges sécurisés entre joueurs (double confirmation)","Événements à durée limitée avec objets exclusifs"],
+  zones:["Hub central avec boutique d'œufs ou de graines","Parcelles ou enclos personnels","Zone d'échange","Zone d'événement"],
+  ui:["Ouverture d'œuf animée","Inventaire avec filtres par rareté","Index de collection","Fenêtre d'échange","Probabilités affichées sur chaque œuf"],
+  save:["Monnaie","Inventaire complet (objet, rareté, mutation)","Index débloqué","Historique d'échanges récent"],
+  money:["Game pass chance +","Game pass emplacements d'inventaire","Produit pack de monnaie","Produit ouverture triple (afficher les probabilités)"],
+  sfx:["Ouverture d'œuf / éclosion","Fanfare de rareté (plus forte pour les rares)","Pousse de plante","Échange réussi"],
+  first5:"Le joueur ouvre un premier œuf gratuit dans les 20 premières secondes, obtient un objet, voit qu'il en existe des plus rares et découvre l'index à compléter."},
+ throwfeed:{core:["Le joueur ramasse ou achète de la nourriture ou des objets","Il les lance ou les donne à une créature ou un personnage","La créature grandit ou évolue à chaque palier","L'évolution débloque de nouvelles zones ou de meilleures récompenses","Il recommence avec une créature plus rare"],
+  systems:["Créature qui change visiblement de taille et de forme","Paliers d'évolution (5 à 10)","Types de nourriture avec valeur différente","Créatures à collectionner","Lancer avec physique (trajectoire visible)"],
+  zones:["Enclos ou arène centrale","Zones de nourriture","Boutique","Zone d'exposition des créatures évoluées"],
+  ui:["Barre d'évolution","Sélecteur de nourriture","Galerie des créatures","Boutique"],
+  save:["Créatures et leur stade","Monnaie","Nourriture en stock"],
+  money:["Game pass nourriture x2","Produit nourriture légendaire","Game pass emplacement de créature"],
+  sfx:["Lancer (whoosh)","Croc / miam","Évolution (montée)","Cri de la créature"],
+  first5:"Le joueur lance sa première nourriture en 10 secondes et voit la créature grandir avant la fin de la première minute."},
+ rounds:{core:["Les joueurs attendent dans un lobby puis sont envoyés sur une carte","Chacun reçoit un rôle secret","La manche dure 2 à 4 minutes avec un objectif par rôle","Fin de manche : récompenses et cosmétiques","Retour au lobby, nouvelle carte"],
+  systems:["Gestionnaire de manches (lobby → carte → fin)","Rôles attribués au hasard (avec garantie de rotation)","Plusieurs cartes en rotation","Monnaie gagnée par manche","Cosmétiques (skins d'arme, effets) et échanges"],
+  zones:["Lobby avec boutique et classement","3 à 5 cartes de taille moyenne avec cachettes","Zone spectateur pour les éliminés"],
+  ui:["Annonce du rôle en début de manche","Chrono de manche","Écran de fin avec récompenses","Inventaire de cosmétiques"],
+  save:["Monnaie","Cosmétiques","Statistiques (victoires par rôle)"],
+  money:["Produits cosmétiques","Game pass effets de victoire","Pass saisonnier (cosmétiques seulement)"],
+  sfx:["Révélation du rôle","Musique de tension","Élimination","Victoire / défaite"],
+  first5:"Le joueur rejoint une manche en moins de 30 secondes, comprend son rôle grâce à une phrase claire, et finit sa première manche en 3 minutes."},
+ survive:{core:["Les joueurs commencent ensemble dans un lieu dangereux","Ils collectent des ressources ou accomplissent des tâches","Une menace (monstre, nuit, catastrophe) monte en intensité","Ils doivent tenir jusqu'à un objectif clair (X nuits, sortie)","Récompenses et déblocages pour la partie suivante"],
+  systems:["Cycle jour/nuit ou phases de danger","Monstre avec IA (patrouille, poursuite, perte de trace)","Ressources et artisanat simple","Objectif final visible (compteur de nuits, sortie)","Classes ou objets de départ à débloquer"],
+  zones:["Point de départ sûr (feu de camp, abri)","Zones de ressources plus dangereuses en s'éloignant","Lieu final ou boss","Repères visuels pour s'orienter"],
+  ui:["Compteur d'objectif (nuit 3/99)","Santé et faim si besoin","Inventaire léger","Indicateur de danger"],
+  save:["Objets et classes débloqués","Record (nuits survécues)","Monnaie"],
+  money:["Classes de départ","Produit réanimation","Cosmétiques"],
+  sfx:["Ambiance de forêt / bâtiment","Pas du monstre","Battement de cœur (danger proche)","Cri / jumpscare (rare)","Feu de camp (sécurité)"],
+  first5:"Le joueur découvre l'abri, ramasse une première ressource, entend le monstre au loin et comprend l'objectif affiché en haut de l'écran."},
+ rp:{core:["Le joueur choisit une maison, un métier ou un rôle","Il se déplace librement dans la ville ou le lieu","Il interagit avec les objets (portes, véhicules, téléphone)","Il invente des histoires avec les autres joueurs","Il personnalise sa maison et son avatar"],
+  systems:["Maisons à réclamer et décorer","Véhicules","Métiers avec tenue et outils","Objets interactifs (portes, lits, cuisines)","Outils de roleplay : nom affiché, statut, téléphone"],
+  zones:["Quartier résidentiel","Centre-ville (magasins, hôpital, école, police)","Lieu signature lié au thème","Routes pour les véhicules"],
+  ui:["Menu Maisons","Menu Véhicules","Menu Métiers / tenues","Nom et biographie au-dessus de la tête"],
+  save:["Décoration de maison","Véhicules et objets achetés","Tenue favorite"],
+  money:["Game pass véhicules premium","Game pass maisons premium","Game pass objets spéciaux (animal de compagnie, téléphone avancé)"],
+  sfx:["Portes","Moteurs","Sonnette","Ambiance de ville","Musique de radio"],
+  first5:"Le joueur réclame une maison en un clic, prend un véhicule et voit d'autres joueurs déjà en train de jouer une histoire."},
+ fashion:{core:["Un thème est annoncé","Les joueurs ont un temps limité pour s'habiller ou décorer","Ils défilent ou présentent leur création","Tout le monde vote","Classement et récompenses"],
+  systems:["Garde-robe avec catégories","Annonce de thème aléatoire","Défilé avec caméra","Vote de 1 à 5 étoiles","Niveaux qui débloquent des vêtements"],
+  zones:["Loge d'habillage","Podium","Salle d'attente"],
+  ui:["Garde-robe","Chrono","Écran de vote","Classement de fin"],
+  save:["Niveau","Vêtements débloqués","Tenues favorites"],
+  money:["Game pass vêtements VIP","Produit vote bonus non (éviter) → préférer cosmétiques","Pass saisonnier de tenues"],
+  sfx:["Musique de défilé","Flash photo","Applaudissements","Étoiles de vote"],
+  first5:"Le thème s'affiche, le joueur s'habille avec des objets gratuits et défile dans les deux premières minutes."},
+ build:{core:["Le joueur collecte ou achète des pièces","Il assemble un véhicule ou une structure","Il le lance dans un défi (distance, survie, course)","Il gagne de l'argent selon le résultat","Il achète de meilleures pièces"],
+  systems:["Système de construction sur grille (placer, tourner, supprimer)","Pièces avec propriétés (moteur, roue, aile)","Physique du test","Sauvegarde des constructions","Défi avec score"],
+  zones:["Atelier de construction personnel","Rampe ou zone de lancement","Parcours de test"],
+  ui:["Inventaire de pièces","Outils de construction","Bouton Lancer","Résultat du test"],
+  save:["Pièces possédées","Constructions sauvegardées","Meilleur score"],
+  money:["Game pass pièces premium","Game pass emplacements de sauvegarde","Produit argent"],
+  sfx:["Pose de pièce","Moteur","Crash","Résultat"],
+  first5:"Le joueur pose trois pièces, lance sa première construction et voit le résultat en moins de deux minutes."},
+ tycoon:{core:["Le joueur réclame un terrain","Des machines produisent de l'argent","Il achète des boutons pour construire son business étape par étape","Il débloque de nouveaux étages et zones","Rebirth pour un multiplicateur"],
+  systems:["Terrains à réclamer","Boutons d'achat qui construisent la suite","Production automatique","Collecteur d'argent","Rebirth"],
+  zones:["4 à 8 terrains autour d'une place centrale","Chaque terrain se construit en couches"],
+  ui:["Argent","Bouton Collecter","Prix au-dessus de chaque bouton","Rebirth"],
+  save:["Argent","Boutons achetés","Rebirths"],
+  money:["Game pass x2 argent","Game pass auto-collecte","Produit argent instantané"],
+  sfx:["Achat","Machine qui tourne","Caisse enregistreuse","Construction"],
+  first5:"Le joueur réclame un terrain, achète son premier bouton en 10 secondes et voit la première machine apparaître."},
+ td:{core:["Des vagues d'ennemis suivent un chemin","Le joueur place des unités qui attaquent automatiquement","Il gagne de l'argent par ennemi pour améliorer ses unités","Il survit à toutes les vagues ou au boss","Il gagne des invocations pour débloquer de nouvelles unités"],
+  systems:["Chemin et générateur de vagues","Unités avec portée, dégâts, cadence, améliorations","Invocation d'unités avec probabilités affichées","Coop jusqu'à 4 joueurs","Modes de difficulté"],
+  zones:["Lobby avec invocation et équipe","Cartes avec chemin lisible et emplacements"],
+  ui:["Barre d'unités","Vague et vie de la base","Améliorer / vendre","Écran d'invocation"],
+  save:["Unités possédées et niveaux","Monnaie","Cartes terminées"],
+  money:["Produit invocations (probabilités affichées)","Game pass emplacement d'unité","Game pass vitesse x2"],
+  sfx:["Pose d'unité","Tirs / attaques","Mort d'ennemi","Boss","Victoire"],
+  first5:"Le joueur reçoit trois unités gratuites, lance la première carte et gagne la première vague en moins de deux minutes."},
+ arena:{core:["Le joueur choisit un personnage ou un pouvoir","Il entre dans une arène avec les autres","Il combat avec des attaques simples et une attaque spéciale","Il gagne des points par élimination","Il débloque de nouveaux personnages"],
+  systems:["Kit d'attaques par personnage (3 à 4 capacités)","Barres de vie et d'énergie","Physique ragdoll","Combos et esquive","Classement du serveur"],
+  zones:["Arène principale avec obstacles","Zone d'entraînement","Lobby de sélection"],
+  ui:["Boutons de capacité (grands sur mobile)","Vie et énergie","Fil des éliminations","Sélection de personnage"],
+  save:["Personnages débloqués","Monnaie","Statistiques"],
+  money:["Personnages premium (sans être plus forts)","Cosmétiques et effets","Game pass emote"],
+  sfx:["Coups","Capacités spéciales","Ragdoll / chute","Élimination"],
+  first5:"Le joueur choisit un personnage, apprend ses trois attaques dans une zone d'essai et entre dans l'arène en moins d'une minute."},
+ shooter:{core:["Le joueur choisit son équipement","Il rejoint un match court (2 à 5 minutes)","Il élimine les adversaires et accomplit l'objectif","Il gagne de l'expérience et de la monnaie","Il débloque armes et cosmétiques"],
+  systems:["Armes avec cadence, dégâts, recul (calcul côté serveur)","Modes de jeu (duel, équipe)","Matchmaking simple par serveur","Contrôles mobiles (visée assistée légère)","Cosmétiques d'armes"],
+  zones:["Lobby","2 à 3 cartes symétriques et lisibles","Champ de tir pour s'entraîner"],
+  ui:["Viseur","Munitions","Score","Boutons mobiles tir / visée / saut","Écran de fin"],
+  save:["Armes débloquées","Cosmétiques","Niveau"],
+  money:["Skins d'armes","Pass saisonnier cosmétique","Game pass emote"],
+  sfx:["Tirs par arme","Rechargement","Impact","Élimination","Musique de fin"],
+  first5:"Le joueur entre dans un duel ou une partie en moins de 30 secondes avec une arme de base équilibrée."},
+ sport:{core:["Le joueur rejoint une équipe","Un match court commence","Il utilise des capacités ou des règles spéciales pour marquer","Fin de match, récompenses","Il améliore son joueur ou débloque des styles"],
+  systems:["Ballon avec physique (contrôle côté serveur)","Équipes équilibrées automatiquement","Capacités spéciales","Bots si pas assez de joueurs","Classement"],
+  zones:["Terrain avec tribunes","Zone d'entraînement","Lobby"],
+  ui:["Score et chrono","Boutons de tir / passe / capacité","Écran de fin"],
+  save:["Niveau","Capacités et styles","Statistiques"],
+  money:["Styles et célébrations","Game pass capacité cosmétique","Pass saisonnier"],
+  sfx:["Frappe de balle","Sifflet","Foule","But"],
+  first5:"Le joueur rejoint un match en cours et marque ou fait une passe dans la première minute."},
+ obby:{core:["Le joueur traverse des étapes d'obstacles","Chaque étape est un point de sauvegarde","La difficulté monte doucement","Il gagne des récompenses à des étapes clés","Il termine et recommence en mode plus dur"],
+  systems:["Points de sauvegarde par étape","Obstacles variés (sauts, plateformes mobiles, laser)","Compteur d'étape","Mode difficile","Classement de vitesse"],
+  zones:["Suite d'étapes thématiques","Zone de départ","Zone de fin avec récompense"],
+  ui:["Étape actuelle","Bouton Passer l'étape","Chrono"],
+  save:["Étape atteinte","Meilleur temps","Récompenses"],
+  money:["Produit passer une étape","Game pass vitesse","Game pass gravité"],
+  sfx:["Saut","Point de sauvegarde","Chute","Fin"],
+  first5:"Le joueur passe trois étapes faciles en 30 secondes, puis la première vraie difficulté arrive."},
+ fish:{core:["Le joueur lance sa ligne ou creuse","Un mini-jeu de timing pour attraper","Il obtient un poisson ou objet d'une rareté aléatoire","Il vend ou collectionne","Il achète une meilleure canne pour des zones plus rares"],
+  systems:["Mini-jeu d'attrape","Table de raretés par zone","Cannes ou outils améliorables","Index de collection","Événements météo qui changent les prises"],
+  zones:["Quai de départ","Zones de pêche de plus en plus rares","Marchand","Aquarium ou musée"],
+  ui:["Mini-jeu d'attrape","Fiche de prise","Index","Boutique"],
+  save:["Index","Outils","Monnaie","Inventaire"],
+  money:["Game pass chance +","Produit appât rare","Game pass inventaire +"],
+  sfx:["Lancer","Plouf","Moulinet","Prise rare","Ambiance d'eau"],
+  first5:"Le joueur lance sa ligne dans les 10 premières secondes et attrape un premier poisson grâce au mini-jeu."}
+};
+const THEME_ART={
+ animaux:{style:"cartoon arrondi, formes douces, grands yeux",palette:"vert prairie #6BCB77, bleu ciel #74C0FC, crème #FFF3D6, orange chaud #FFA94D",mood:"joyeux et chaleureux",props:["enclos","arbres ronds","bottes de foin","gamelles","panneaux en bois"],music:"happy farm, cheerful ukulele",amb:"birds, meadow"},
+ oeufs:{style:"cartoon brillant, œufs très lisibles avec motifs par rareté",palette:"blanc nacré #F8F9FA, or #FFD43B, violet #9775FA, turquoise #3BC9DB",mood:"excitant et précieux",props:["nids","socles","incubateurs","coffres"],music:"playful, magical",amb:"sparkle, chimes"},
+ horreur:{style:"réaliste stylisé, éclairage sombre, brouillard",palette:"noir bleuté #10131C, gris #495057, rouge sang #C92A2A, jaune lampe #FCC419",mood:"tendu, oppressant",props:["lampes torches","portes grinçantes","meubles abîmés","traces"],music:"dark ambient, horror tension",amb:"wind, creak, distant footsteps"},
+ brainrot:{style:"mème, couleurs saturées, personnages absurdes",palette:"rose fluo #F06595, jaune #FFE066, cyan #22B8CF, vert acide #94D82D",mood:"absurde et drôle",props:["socles de présentation","néons","confettis"],music:"funny, phonk, upbeat",amb:"cartoon, crowd"},
+ anime:{style:"anime cel-shading, effets d'énergie",palette:"bleu nuit #1C2541, blanc #F8F9FA, cyan #4DABF7, magenta #E64980",mood:"épique et dynamique",props:["temples","bannières","arbres de cerisier","rochers"],music:"epic, japanese, battle",amb:"wind, energy"},
+ cute:{style:"kawaii, pastel, formes rondes",palette:"rose pastel #FFC9DE, lavande #D0BFFF, menthe #B2F2BB, crème #FFF9DB",mood:"doux et mignon",props:["nuages","bonbons","coussins","étoiles"],music:"cute, kawaii, bubbly",amb:"chimes, soft pop"},
+ nourriture:{style:"cartoon appétissant, aliments surdimensionnés",palette:"jaune citron #FFE066, rouge tomate #FA5252, vert #51CF66, brun pain #D9A066",mood:"gourmand et coloré",props:["comptoirs","stands","fours","caisses de fruits"],music:"cheerful kitchen, jazzy",amb:"kitchen, sizzling"},
+ vehicules:{style:"cartoon semi-réaliste, carrosseries brillantes",palette:"rouge #E03131, bleu #1971C2, gris asphalte #343A40, jaune #FCC419",mood:"rapide et énergique",props:["routes","garages","rampes","cônes"],music:"rock, driving, energetic",amb:"engine, traffic"},
+ sport:{style:"cartoon sportif, terrain très lisible",palette:"vert pelouse #37B24D, blanc #FFFFFF, bleu équipe #1C7ED6, rouge équipe #F03E3E",mood:"compétitif et festif",props:["buts","tribunes","drapeaux","projecteurs"],music:"sport, stadium, energetic",amb:"crowd, whistle"},
+ armee:{style:"low-poly militaire, silhouettes nettes",palette:"kaki #5C6B3C, sable #D9C8A0, gris acier #495057, orange signal #FD7E14",mood:"tactique et intense",props:["sacs de sable","caisses","tours de guet","véhicules"],music:"military, epic drums",amb:"wind, distant explosions"},
+ noel:{style:"cartoon hivernal, neige douce, lumières chaudes",palette:"blanc neige #F8F9FA, rouge #E03131, vert sapin #2B8A3E, or #FAB005",mood:"festif et chaleureux",props:["sapins","cadeaux","guirlandes","bonhommes de neige"],music:"christmas, jingle, sleigh bells",amb:"snow, fireplace"},
+ prison:{style:"cartoon urbain, contrastes forts",palette:"orange combinaison #FD7E14, gris béton #868E96, bleu police #1864AB, jaune #FCC419",mood:"tendu mais drôle",props:["cellules","grillages","voitures de police","projecteurs"],music:"heist, tension, funk",amb:"alarm, radio"},
+ espace:{style:"sci-fi cartoon, lumières émissives",palette:"bleu nuit #0B1026, violet #7048E8, cyan #3BC9DB, blanc #F8F9FA",mood:"mystérieux et aventureux",props:["fusées","modules","cratères","planètes en fond"],music:"space, synth, ambient",amb:"hum, beeps"}
+};
+
+/* ---------- Idée : construction commune ---------- */
+function buildIdea({loopK,genre,thK,twist,title,noun,text}){
+  const loop=A.loops.find(l=>l.k===loopK)||A.loops[0];
+  const gs=Object.fromEntries(A.big.map(s=>[s.k,s]));
+  if(!genre||!gs[genre]){const c={};G.filter(g=>g.loops.includes(loop.k)&&gs[g.g]).forEach(g=>c[g.g]=(c[g.g]||0)+g.p);genre=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]?.[0]||loop.genre}
+  const th=A.themes.find(t=>t.k===thK)||A.themes[0];const T=THEMES[th.k];
+  noun=noun||T.nouns[0];twist=twist||TWISTS[0];title=fixA(title||LOOPS[loop.k].titles[0].replace("{N}",noun));
+  const maxN=Math.max(...A.loops.map(l=>l.n)),gsx=gs[genre];
+  const sGenre=gsx?Math.round(gsx.pot/100*30):12;
+  const sLoop=Math.round(Math.min(1,loop.newN/Math.max(...A.loops.map(l=>l.newN)))*25);
+  const sTheme=Math.round(Math.min(1,th.lift/2)*20);
+  const sSeason=(th.k=="noel"&&nextSeason().name=="Noël")?10:/saison/.test(twist)?5:0;
+  const sat=Math.round(loop.n/maxN*20);
+  const score=Math.max(5,Math.min(99,sGenre+sLoop+sTheme+sSeason+15-sat));
+  const sameTheme=G.filter(g=>g.loops.includes(loop.k)&&g.themes.includes(th.k));
+  return {loop,genre,gsx,th,T,noun,twist,title,score,parts:{sGenre,sLoop,sTheme,sSeason,sat},sameTheme,text:text||""};
+}
+const ideaKey=I=>({loopK:I.loop.k,genre:I.genre,thK:I.th.k,twist:I.twist,title:I.title,noun:I.noun,text:I.text||""});
+
+/* ---------- Fiche Info ---------- */
+function infoHTML(I){
+  const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k];
+  const sims=similarGames(I.title+" "+(I.text||"")+" "+L.name,I).slice(0,6);
+  const best=I.loop.ex[0];
+  return `<div class="grid" style="gap:12px;border-top:1px solid var(--line);padding-top:12px">
+   <div class="grid g2" style="gap:12px">
+    <div><b>La boucle de jeu</b><ol class="list">${LD.core.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+    <div><b>Les 5 premières minutes</b><p style="margin:4px 0 8px">${esc(LD.first5)}</p>
+     <b>Direction artistique</b><p class="src" style="margin:4px 0">${esc(ART.style)} · ambiance ${esc(ART.mood)}<br>Palette : ${esc(ART.palette)}</p></div>
+   </div>
+   <div class="grid g3" style="gap:12px">
+    <div><b>Systèmes à coder</b><ul class="list">${LD.systems.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+    <div><b>Carte</b><ul class="list">${LD.zones.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+    <div><b>Monétisation</b><ul class="list">${LD.money.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>
+   </div>
+   <div><b>Jeux du top 1000 les plus proches</b>
+    <div class="tablebox" style="margin-top:6px"><table><thead><tr><th>Jeu</th><th class="n">#</th><th class="n">Joueurs</th><th class="n">Âge</th><th class="n">Note</th></tr></thead><tbody>
+    ${sims.map(g=>`<tr><td><a href="${gameUrl(g)}">${esc(g.tn)}</a></td><td class="n">${g.rank}</td><td class="n">${fr(g.p)}</td><td class="n">${ageTxt(g.age)}</td><td class="n">${g.r!=null?Math.round(g.r)+" %":"—"}</td></tr>`).join("")||`<tr><td colspan="5" class="src">Aucun jeu proche : c'est une niche.</td></tr>`}
+    </tbody></table></div></div>
+   <div class="grid g2" style="gap:12px">
+    <div><b>Les chiffres de la recette</b><p class="src" style="margin:4px 0">${I.loop.n} jeux · ${fr(I.loop.p)} joueurs · jeu médian ${fr(I.loop.med)} joueurs · ${I.loop.newN} jeux récents · ${I.loop.trN} mis en avant par Roblox. Le plus gros : ${best?`<a href="${gameUrl(best)}">${esc(best.tn)}</a> (${fmtK(best.p)})`:"—"}.</p></div>
+    <div><b>Taille du projet</b><p class="src" style="margin:4px 0">${projectSize(I.loop.k)}</p></div>
+   </div>
+  </div>`;
+}
+function projectSize(k){const s={steal:"Moyen : 3 à 5 semaines seul pour une première version jouable.",stat:"Petit : 1 à 2 semaines pour une première version.",collect:"Moyen : 3 à 5 semaines (l'économie et les échanges prennent du temps).",throwfeed:"Petit à moyen : 2 à 3 semaines.",rounds:"Moyen : 3 à 4 semaines (gestion des manches et des rôles).",survive:"Moyen à gros : 4 à 6 semaines (IA du monstre et ambiance).",rp:"Gros : beaucoup de contenu (maisons, véhicules, métiers).",fashion:"Moyen : surtout du contenu (vêtements).",build:"Moyen à gros : système de construction et physique.",tycoon:"Petit à moyen : 2 à 3 semaines.",td:"Moyen à gros : unités, vagues et équilibrage.",arena:"Moyen : combat qui doit être bon au toucher.",shooter:"Gros : armes, réseau et anti-triche.",sport:"Moyen : physique du ballon et équipes.",obby:"Petit : 1 à 2 semaines.",fish:"Moyen : 2 à 4 semaines."};return s[k]||""}
+const ageTxt2=a=>a>=9999?"—":a<60?a+" j":a<730?Math.round(a/30)+" mois":Math.round(a/365)+" ans";
+if(typeof ageTxt==="undefined")window.ageTxt=ageTxt2;
+
+/* ---------- Jeux similaires ---------- */
+let IDF=null;
+function buildIdf(){IDF={};G.forEach(g=>{new Set(toks(g.n+" "+g.d,true).concat(toks(g.n,false))).forEach(w=>IDF[w]=(IDF[w]||0)+1)});for(const w in IDF)IDF[w]=Math.log(1000/IDF[w])}
+function similarGames(text,I){
+  if(!IDF)buildIdf();
+  const q=new Set(toks(text,false).concat(toks(text,true)));
+  const out=G.map(g=>{const t=new Set(toks(g.n,false)),d=new Set(toks(g.d,true));let s=0;q.forEach(w=>{if(t.has(w))s+=2*(IDF[w]||1);else if(d.has(w))s+=(IDF[w]||1)});
+    if(I){if(g.loops.includes(I.loop.k))s+=2;if(g.themes.includes(I.th.k))s+=2}return {g,s}}).filter(x=>x.s>0);
+  return out.sort((a,b)=>b.s-a.s||b.g.p-a.g.p).map(x=>x.g);
+}
+
+const FR_EN={chat:"Cat",chats:"Cat",chien:"Dog",chiens:"Dog",lapin:"Bunny",oeuf:"Egg",oeufs:"Egg",poisson:"Fish",poissons:"Fish",voiture:"Car",voitures:"Car",maison:"House",ville:"City",monstre:"Monster",monstres:"Monster",fantome:"Ghost",citron:"Lemon",gateau:"Cake",bonbon:"Candy",bonbons:"Candy",robot:"Robot",robots:"Robot",ninja:"Ninja",epee:"Sword",cheval:"Horse",licorne:"Unicorn",requin:"Shark",singe:"Monkey",ours:"Bear",loup:"Wolf",renard:"Fox",tigre:"Tiger",lion:"Lion",pingouin:"Penguin",pizza:"Pizza",burger:"Burger",fusee:"Rocket",planete:"Planet",zombie:"Zombie",zombies:"Zombie",sorciere:"Witch",magicien:"Wizard",pirate:"Pirate",pirates:"Pirate",tresor:"Treasure",ile:"Island",prison:"Prison",ecole:"School",hopital:"Hospital",dragon:"Dragon",dragons:"Dragon",dino:"Dino",dinosaure:"Dino",slime:"Slime",banane:"Banana",pomme:"Apple",neige:"Snow",sapin:"Tree",abeille:"Bee",abeilles:"Bee",fourmi:"Ant",araignee:"Spider",serpent:"Snake",vache:"Cow",cochon:"Pig",poule:"Chicken",canard:"Duck",capybara:"Capybara",axolotl:"Axolotl",chevalier:"Knight",chateau:"Castle",avion:"Plane",bateau:"Boat",train:"Train",tank:"Tank",soldat:"Soldier",policier:"Cop",voleur:"Thief",cuisinier:"Chef",restaurant:"Restaurant",magasin:"Shop",diamant:"Diamond",or:"Gold",cristal:"Crystal",potion:"Potion",cadeau:"Gift",pere:"",noel:"Santa"};
+const unacc=w=>w.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/œ/g,"oe");
+function nounFrom(raw){if(!IDF)buildIdf();const c={};const words=norm(raw).match(/[a-zà-ÿ0-9]+/g)||[];
+  words.forEach((w,i)=>{const u=unacc(w);let n=null;if(FR_EN[u])n=FR_EN[u];else if(u.length>=4&&IDF[u]!==undefined&&IDF[u]>1.5&&!/^(avec|dans|pour|plus|tous|tout|leur|elle|sont|fait|faire|game|jeux|play|joueur|joueurs|peut|peuvent)$/.test(u))n=u[0].toUpperCase()+u.slice(1);
+    if(n){c[n]=c[n]||{n:0,i};c[n].n++}});
+  const best=Object.entries(c).sort((a,b)=>b[1].n-a[1].n||a[1].i-b[1].i)[0];return best?best[0]:null}
+/* ---------- Noter MON idée ---------- */
+function rateMyIdea(){
+  const raw=$("#myText").value.trim();const out=$("#myOut");
+  if(raw.length<15){out.innerHTML=`<p class="src">Décris ton idée en une ou deux phrases (au moins 15 caractères) : ce que fait le joueur, le thème, ce qui la rend différente.</p>`;return}
+  const t=norm(raw);
+  const loopHits=Object.keys(LOOPS).filter(k=>LOOPS[k].re.test(t)||FR_LOOP[k]?.test(t));
+  const themeHits=Object.keys(THEMES).filter(k=>THEMES[k].re.test(t)||FR_THEME[k]?.test(t));
+  const pos=k=>{const m=[LOOPS[k].re.exec(t),FR_LOOP[k]?.exec(t)].filter(Boolean).map(x=>x.index);return m.length?Math.min(...m):1e9};
+  loopHits.sort((a,b)=>pos(a)-pos(b));
+  const loopK=loopHits[0]||"collect";
+  themeHits.sort((a,b)=>{const p=k=>{const m=[THEMES[k].re.exec(t),FR_THEME[k]?.exec(t)].filter(Boolean).map(x=>x.index);return m.length?Math.min(...m):1e9};return p(a)-p(b)});
+  const thK=themeHits[0]||[...A.themes].sort((a,b)=>b.lift-a.lift)[0].k;
+  const twist="les éléments décrits par le créateur";
+  const myNoun=nounFrom(raw)||THEMES[thK].nouns[0];
+  const titles=LOOPS[loopK].titles.map(x=>fixA(x.replace("{N}",myNoun)));
+  const titleGuess=titles[0];
+  const I=buildIdea({loopK,thK,twist,title:titleGuess,noun:myNoun,text:raw});
+  const sims=similarGames(raw,I).slice(0,6);
+  const bigSim=sims.filter(g=>g.p>50000);
+  // Améliorations
+  const tips=[];const has=re=>re.test(t);
+  if(!loopHits.length)tips.push(["Dis ce que le joueur fait en boucle","Je n'ai pas reconnu d'action répétée (collectionner, voler, survivre, combattre…). Une bonne idée Roblox tient en une phrase : « le joueur fait X pour obtenir Y, puis Z ».","bad"]);
+  if(loopHits.length>2)tips.push(["Choisis une boucle principale",`Ton idée mélange ${loopHits.length} recettes (${loopHits.map(k=>LOOPS[k].name.toLowerCase()).join(", ")}). Garde-en une au centre, les autres en bonus, sinon le joueur ne comprend pas quoi faire.`,"warn"]);
+  if(I.loop.n>=90)tips.push(["Recette très encombrée",`${I.loop.n} jeux du top 1000 utilisent déjà « ${LOOPS[loopK].name.toLowerCase()} ». Ajoute un twist clair, par exemple ${TWISTS[Math.floor(Math.random()*TWISTS.length)]}.`,"warn"]);
+  if(!themeHits.length){const r=[...A.themes].sort((a,b)=>b.lift-a.lift).slice(0,3);tips.push(["Donne un thème qui se voit",`Aucun thème reconnu. Les thèmes qui montent en ce moment : ${r.map(x=>THEMES[x.k].label.toLowerCase()).join(", ")}.`,"warn"])}
+  else if(I.th.lift<0.8)tips.push(["Thème plutôt calme",`« ${THEMES[thK].label} » n'est pas en hausse chez les jeux récents. Ça peut marcher si tu le rends très visible, ou combine-le avec ${[...A.themes].sort((a,b)=>b.lift-a.lift)[0]&&THEMES[[...A.themes].sort((a,b)=>b.lift-a.lift)[0].k].label.toLowerCase()}.`,"warn"]);
+  if(!has(/ami|amis|ensemble|coop|multi|joueurs|[ée]quipe|[ée]chang|trade|friend|team|vol/))tips.push(["Rends-le social","Les gros jeux Roblox se jouent avec les autres : échanges, coop, vol, compétition, classement. Dis ce que les joueurs font ensemble.","warn"]);
+  if(!has(/am[ée]lior|niveau|d[ée]bloqu|upgrade|rebirth|collection|rare|[ée]volu|level|unlock/))tips.push(["Ajoute une progression","Qu'est-ce qui pousse à revenir demain ? Améliorations, niveaux, raretés à collectionner, rebirth…","warn"]);
+  if(!has(/gagn|survi|finir|fin\b|objectif|manche|record|classement|win|round/))tips.push(["Donne un objectif court","Chaque session doit avoir un but visible (tenir 5 minutes, finir l'étape, battre le record).","warn"]);
+  if(!has(/mobile|t[ée]l[ée]phone|tactile|phone/))tips.push(["Pense téléphone d'abord","La majorité des joueurs Roblox sont sur mobile : prévois des gros boutons et des contrôles simples dès le départ.",""]);
+  if(!has(/game ?pass|robux|boutique|acheter|vendre|pass\b/))tips.push(["Prévois comment le jeu rapporte",`Pour cette recette : ${LOOP_DESIGN[loopK].money.slice(0,3).join(" ; ")}.`,""]);
+  if(bigSim.length)tips.push(["Différencie-toi de jeux déjà gros",`Ton idée ressemble à ${bigSim.slice(0,2).map(g=>`<a href="${gameUrl(g)}">${esc(g.tn)}</a> (${fmtK(g.p)} joueurs)`).join(" et ")}. Dis en une phrase ce que ton jeu fait que ceux-là ne font pas.`,"warn"]);
+  tips.push(["Timing",seasonText(),""]);
+  MY=I;
+  out.innerHTML=`<article class="idea">
+   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:start">
+    <div class="grid" style="gap:6px"><span class="stamp">Ton idée · ${esc(gname(I.genre))} · ${esc(LOOPS[loopK].name)} · ${esc(THEMES[thK].label)}</span><div class="title">${esc(titleGuess)}</div><p class="pitch src" style="font-size:14px">« ${esc(raw)} »</p></div>
+    <div style="text-align:right"><div class="bignum">${I.score}</div><div class="src">potentiel /100</div></div>
+   </div>
+   <div class="scorebar">
+    <div>Place dans le genre<b>${I.parts.sGenre}/30</b><div class="meter"><i style="width:${I.parts.sGenre/30*100}%"></i></div></div>
+    <div>Recette qui perce<b>${I.parts.sLoop}/25</b><div class="meter"><i style="width:${I.parts.sLoop/25*100}%"></i></div></div>
+    <div>Thème qui monte<b>${I.parts.sTheme}/20</b><div class="meter"><i style="width:${I.parts.sTheme/20*100}%"></i></div></div>
+    <div>Bonus saison<b>${I.parts.sSeason}/10</b><div class="meter"><i style="width:${I.parts.sSeason/10*100}%"></i></div></div>
+    <div>Concurrence<b>−${I.parts.sat}</b><div class="meter"><i style="width:${I.parts.sat/20*100}%;background:var(--bad)"></i></div></div>
+   </div>
+   <div class="src">Reconnu dans ton texte : ${loopHits.length?loopHits.map(k=>`<span class="chip">${esc(LOOPS[k].name)}</span>`).join(" "):"<span class='chip bad'>aucune recette</span>"} ${themeHits.map(k=>`<span class="chip hot">${esc(THEMES[k].label)}</span>`).join(" ")}</div>
+   <div><b>Comment l'améliorer</b>
+    <div class="grid" style="gap:8px;margin-top:8px">${tips.map(([h,b,c])=>`<div class="card" style="padding:10px 12px;gap:4px;border-left:3px solid ${c=="bad"?"var(--bad)":c=="warn"?"var(--warn)":"var(--line)"}"><b>${esc(h)}</b><span class="src" style="font-size:13px">${b}</span></div>`).join("")}</div></div>
+   <div><b>Titres possibles</b> (mot-clé dans les 3 premiers mots ; le premier sert de titre provisoire) <div class="kv" style="margin-top:6px">${titles.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div></div>
+   <div class="controls"><button data-myinfo>Info</button><button class="primary" data-mychoose>Choisir cette idée</button></div>
+   <div id="myInfo"></div>
+  </article>`;
+  out.querySelector("[data-myinfo]").onclick=e=>{const box=$("#myInfo");if(box.innerHTML){box.innerHTML="";e.target.textContent="Info"}else{box.innerHTML=infoHTML(I);e.target.textContent="Masquer"}};
+  out.querySelector("[data-mychoose]").onclick=()=>chooseIdea(I);
+}
+let MY=null;
+
+/* ---------- Choisir → plan de production ---------- */
+function chooseIdea(I){store.set("labo-chosen",{...ideaKey(I),at:Date.now()});location.hash="plan"}
+function currentChosen(){const k=store.get("labo-chosen");if(!k||!G.length)return null;try{return buildIdea(k)}catch{return null}}
+
+function brief(I){
+  const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k];
+  const refs=I.loop.ex.map(g=>`${g.tn} (${fr(g.p)} joueurs)`).join(", ");
+  return `BRIEF DU JEU « ${I.title} » (plateforme : Roblox, moteur : Roblox Studio, langage : Luau)
+
+Pitch : ${pitchOf(I)}${I.text?`\n(Idée décrite par le créateur : respecte-la en priorité. La recette « ${L.name} » et le thème « ${I.T.label} » ont été reconnus dans son texte pour guider les choix.)`:""}
+Genre Roblox : ${gname(I.genre)}. Recette principale : ${L.name}.
+Jeux de référence du top 1000 actuel : ${refs}.
+Public : joueurs Roblox de 9 à 16 ans, majoritairement sur téléphone. Sessions de 10 à 20 minutes.
+
+Boucle de jeu :
+${LD.core.map((x,i)=>`${i+1}. ${x}`).join("\n")}
+
+Les 5 premières minutes : ${LD.first5}
+
+Systèmes : ${LD.systems.join(" ; ")}.
+Carte : ${LD.zones.join(" ; ")}.
+Interface : ${LD.ui.join(" ; ")}.
+Données sauvegardées : ${LD.save.join(" ; ")}.
+Monétisation (jamais « payer pour gagner » contre les autres joueurs) : ${LD.money.join(" ; ")}.
+
+Direction artistique : style ${ART.style}. Ambiance ${ART.mood}. Palette : ${ART.palette}. Éléments de décor : ${ART.props.join(", ")}.
+
+Règles de production pour toute l'équipe :
+- Modèles 3D : faits dans Blender, exportés en FBX, importés avec le 3D Importer de Roblox Studio. Pas de modèles générés par IA, pas de modèles gratuits de la Toolbox dans le jeu final.
+- Sons et musiques : uniquement depuis la bibliothèque audio de Roblox (Creator Store / Toolbox → Audio). Ne générer aucun son, ne pas importer de son extérieur.
+- Code : Luau, logique importante côté serveur uniquement (ne jamais faire confiance au client).
+- Respecter les règles de la communauté Roblox et afficher les probabilités de tout objet aléatoire payant.
+- Le téléphone est la plateforme n°1 : gros boutons, interface lisible sur petit écran, bonnes performances.`;
+}
+function agents(I){
+  const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k],B=brief(I);
+  const head=(role)=>`Tu es ${role} dans une petite équipe qui crée un jeu Roblox. Lis d'abord le brief ci-dessous, puis fais ta mission. Réponds en français. Si une information te manque, fais un choix raisonnable, écris-le clairement dans une section « Hypothèses », et continue.\n\n${B}\n\n`;
+  return [
+   {id:"chef",name:"Chef de projet",phase:"Phase 0 — avant tout le reste",why:"Organise le travail et vérifie que tout s'emboîte.",prompt:head("le chef de projet")+`TA MISSION
+1. Découpe le jeu en tâches pour ces agents : Directeur artistique, Game designer, Level designer, Modélisateur 3D (Blender), Sound designer, Programmeur serveur, Programmeur interface, Économie et monétisation, Testeur, Lancement.
+2. Donne l'ordre de travail et les dépendances (qui attend qui).
+3. Définis une version 1 minimale (MVP) jouable en 2 à 3 semaines : liste exacte de ce qui est dedans et de ce qui est repoussé à plus tard.
+4. Propose 3 jalons avec une date relative (semaine 1, 2, 3) et ce qui doit être testable à chacun.
+5. Fixe les conventions communes : noms des dossiers dans l'Explorer de Roblox Studio (ReplicatedStorage, ServerScriptService, StarterGui…), nommage des modèles, des sons et des RemoteEvents.
+
+LIVRABLE : un plan en tableau (tâche, agent, dépend de, semaine), la liste MVP, et les conventions de nommage.`},
+   {id:"da",name:"Directeur artistique (DA)",phase:"Phase 1",why:"Fixe le look du jeu pour que modèles, carte et interface aillent ensemble.",prompt:head("le directeur artistique")+`TA MISSION
+1. Écris le guide de style : formes (arrondies ou anguleuses), niveau de détail, proportions des personnages et objets par rapport à un avatar Roblox (environ 5 studs de haut).
+2. Palette finale : 6 à 8 couleurs avec code hex et usage (décor, objets rares, interface, danger…). Pars de : ${ART.palette}.
+3. Éclairage dans Roblox Studio : réglages de Lighting (Technology, ClockTime, Brightness, Ambient, Atmosphere, couleurs du ciel) pour l'ambiance ${ART.mood}.
+4. Code couleur des raretés ou des équipes si le jeu en a.
+5. Style de l'interface : formes des boutons, coins arrondis, polices Roblox disponibles (choisis parmi les polices intégrées de Roblox), tailles minimales sur téléphone.
+6. Liste complète des modèles 3D à créer avec, pour chacun : nom, description, taille en studs, niveau de détail, priorité (MVP ou plus tard). Inclure au minimum : ${ART.props.join(", ")}, et les objets propres à la recette « ${L.name} ».
+7. Brief de l'icône (512×512) et des miniatures (1920×1080) du jeu : composition, personnage ou objet au centre, texte éventuel.
+
+LIVRABLE : le guide de style complet + le tableau des modèles à transmettre au modélisateur 3D.`},
+   {id:"gd",name:"Game designer",phase:"Phase 1",why:"Transforme l'idée en règles précises et en chiffres.",prompt:head("le game designer")+`TA MISSION
+1. Écris les règles complètes, étape par étape, de la boucle : ${LD.core.join(" → ")}.
+2. Donne tous les chiffres : vitesses, temps, prix, gains, probabilités, paliers de progression (au moins 15 paliers), et la courbe de progression sur 1 heure, 1 jour et 1 semaine de jeu.
+3. Systèmes détaillés : ${LD.systems.join(" ; ")}. Pour chacun : comment il marche, ses paramètres, ses cas limites.
+4. Les 5 premières minutes, seconde par seconde : ${LD.first5}
+5. Ce qui fait revenir le joueur : récompense quotidienne, objectifs, événements${I.text?"":`, et le twist « ${I.twist} »`}.
+6. Ce qui est sauvegardé : ${LD.save.join(" ; ")}. Donne la structure exacte des données (noms de champs, types, valeurs par défaut).
+7. Les risques d'abus (triche, farm, AFK) et comment les limiter.
+
+LIVRABLE : document de game design + un tableau d'équilibrage (paliers, prix, gains, probabilités) prêt à copier dans un ModuleScript de configuration.`},
+   {id:"level",name:"Level designer (carte)",phase:"Phase 2 — après le DA et le game designer",why:"Construit la carte dans Roblox Studio.",prompt:head("le level designer")+`TA MISSION
+1. Fais le plan de la carte vu du dessus avec les zones : ${LD.zones.join(" ; ")}. Donne les dimensions en studs et les distances entre zones (le joueur marche à environ 16 studs par seconde par défaut).
+2. Indique le parcours du nouveau joueur : où il apparaît, ce qu'il voit en premier, où il va ensuite.
+3. Placement : points d'apparition (SpawnLocation), zones de sécurité, emplacements des PNJ, boutiques et éléments interactifs.
+4. Décor : quels modèles du DA vont où, et la densité de décor par zone.
+5. Performance téléphone : nombre maximal de pièces visibles, utilisation de StreamingEnabled, pas de pièces inutilement petites ou nombreuses.
+6. Étapes pour le construire dans Roblox Studio : formes de base en Parts d'abord (blockout), test de la circulation, puis remplacement par les modèles Blender.
+7. Organisation dans l'Explorer : un dossier Map dans Workspace avec un sous-dossier par zone.
+
+LIVRABLE : plan de la carte décrit précisément (avec un schéma en texte), liste des zones avec dimensions, et la checklist de construction dans Studio.`},
+   {id:"model",name:"Modélisateur 3D (Blender)",phase:"Phase 2 — après le DA",why:"Crée tous les modèles dans Blender, pas d'IA ni de modèles tout faits.",prompt:head("le modélisateur 3D")+`RÈGLE ABSOLUE : tous les modèles sont faits à la main dans Blender. Pas de modèle généré par IA, pas de modèle téléchargé, pas de modèle de la Toolbox.
+
+TA MISSION
+Pour chaque modèle de la liste du DA (au minimum : ${ART.props.join(", ")} et les objets de la recette « ${L.name} ») :
+1. Décris comment le modéliser dans Blender étape par étape (formes de départ, modificateurs utiles comme Bevel, Mirror, Array, Subdivision avec parcimonie).
+2. Budget : style ${ART.style}, peu de polygones. Reste léger (quelques centaines à quelques milliers de triangles par objet) et donne un objectif de triangles pour chaque modèle.
+3. Échelle : règle-la pour qu'un avatar Roblox fasse environ 5 studs, et vérifie la taille au moment de l'import dans Studio.
+4. Pivot (origine) au bon endroit, transformations appliquées (Ctrl+A), noms clairs en anglais sans espaces.
+5. Couleurs et textures : couleurs unies selon la palette du DA, ou textures simples. Indique si on utilise des couleurs de matériau ou une texture, et la taille de texture (512 ou 1024).
+6. Export : FBX depuis Blender, un fichier par modèle (ou par lot cohérent), avec les bons réglages d'export, puis import dans Roblox Studio avec le 3D Importer.
+7. Dans Studio : réglage de CollisionFidelity (Box ou Hull pour le décor, plus précis seulement si nécessaire), Anchored pour le décor, et RenderFidelity.
+8. Les objets animés (si besoin) : armature simple, et comment importer l'animation.
+
+LIVRABLE : une fiche par modèle (étapes Blender, triangles visés, taille en studs, réglages d'import) + l'ordre de production (MVP d'abord).`},
+   {id:"sound",name:"Sound designer",phase:"Phase 2",why:"Choisit tous les sons dans la bibliothèque de Roblox, rien n'est généré.",prompt:head("le sound designer")+`RÈGLE ABSOLUE : tous les sons et musiques viennent de la bibliothèque audio de Roblox (Creator Store, ou la Toolbox de Roblox Studio → Audio). Ne génère aucun son, n'en crée aucun, n'importe rien de l'extérieur.
+
+TA MISSION
+1. Liste tous les sons nécessaires. Au minimum : ${LD.sfx.join(", ")}, plus les clics et validations de l'interface, et la musique.
+2. Pour chaque son, donne les mots-clés en anglais à taper dans la bibliothèque (ex. pour la musique : « ${ART.music} » ; pour l'ambiance : « ${ART.amb} »), la durée idéale, s'il boucle, et son volume de départ.
+3. Explique comment vérifier qu'un son peut être utilisé dans le jeu (son de la bibliothèque Roblox, disponible pour les expériences) et comment noter son ID (rbxassetid://…).
+4. Organisation dans Studio : SoundGroups (Musique, Effets, Interface, Ambiance) dans SoundService, volumes par groupe, et un réglage pour couper la musique.
+5. Sons 3D : quels sons sont placés dans le monde (dans une Part, avec RollOffMaxDistance) et lesquels sont joués dans l'interface.
+6. Plan musical : quelle musique dans quelle zone ou à quel moment, et comment faire les transitions.
+
+LIVRABLE : un tableau (nom du son, usage, mots-clés de recherche, boucle oui/non, volume, groupe, case vide pour l'ID trouvé) + les réglages de SoundService.`},
+   {id:"server",name:"Programmeur serveur (Luau)",phase:"Phase 3 — après le game designer",why:"Code toute la logique du jeu côté serveur.",prompt:head("le programmeur gameplay côté serveur")+`TA MISSION
+Écris le code Luau complet côté serveur, prêt à coller dans Roblox Studio.
+1. Architecture : liste des Scripts et ModuleScripts (dans ServerScriptService et ReplicatedStorage), le rôle de chacun, et un ModuleScript de configuration avec tous les chiffres du game designer.
+2. Systèmes : ${LD.systems.join(" ; ")}.
+3. Sauvegarde avec DataStoreService : ${LD.save.join(" ; ")}. Gère le chargement à l'arrivée, la sauvegarde régulière, à la sortie et à la fermeture du serveur (BindToClose), avec pcall et nouvelles tentatives en cas d'échec.
+4. Communication : liste des RemoteEvents et RemoteFunctions avec leurs paramètres. Le serveur vérifie TOUT (distance, temps de recharge, argent suffisant, objet possédé).
+5. Anti-triche de base : limites de fréquence, vérification des positions, aucune valeur importante calculée par le client.
+6. Achats : traitement des game passes (UserOwnsGamePassAsync) et des produits (ProcessReceipt, avec sauvegarde avant de confirmer l'achat).
+7. Performance : éviter les boucles lourdes, utiliser des événements, nettoyer à la sortie d'un joueur.
+
+LIVRABLE : tout le code, fichier par fichier, avec l'emplacement exact de chaque script dans l'Explorer et des commentaires en français.`},
+   {id:"client",name:"Programmeur interface et client",phase:"Phase 3 — en parallèle du serveur",why:"Fait les écrans, les boutons et les contrôles téléphone.",prompt:head("le programmeur de l'interface et du client")+`TA MISSION
+Écris le code Luau côté client et construis l'interface.
+1. Écrans : ${LD.ui.join(" ; ")}. Pour chacun : disposition (en Scale et non en pixels, pour tous les écrans), éléments, animations (TweenService).
+2. Style selon le guide du DA : couleurs, coins arrondis (UICorner), contours (UIStroke), polices.
+3. Téléphone d'abord : boutons d'au moins 60 pixels, pas d'action qui demande un clavier, test en mode téléphone dans l'émulateur de Studio. Utilise ContextActionService pour les actions avec un bouton tactile.
+4. Retours visuels : nombres qui s'envolent, flash de rareté, sons d'interface (IDs du sound designer).
+5. LocalScripts : emplacement (StarterPlayerScripts, StarterGui), écoute des RemoteEvents du serveur, aucune décision importante côté client.
+6. Tutoriel des premières minutes : flèches et messages qui guident le joueur.
+
+LIVRABLE : la structure de chaque ScreenGui (arborescence des éléments) + tout le code client, fichier par fichier, commenté en français.`},
+   {id:"eco",name:"Économie et monétisation",phase:"Phase 3",why:"Fixe les prix et vérifie que le jeu est juste et rentable.",prompt:head("le responsable de l'économie et de la monétisation")+`TA MISSION
+1. Monnaies du jeu : comment on les gagne, comment on les dépense, et le rythme de gain par heure.
+2. Liste des game passes et produits de développeur : ${LD.money.join(" ; ")}. Pour chacun : nom, description pour la boutique, prix en Robux, et pourquoi ce prix.
+3. Vérifie que le jeu reste juste : pas d'avantage payant écrasant contre les autres joueurs, et le joueur gratuit doit pouvoir tout découvrir.
+4. Objets aléatoires payants : affiche toujours les probabilités, conformément aux règles de Roblox.
+5. Où et quand proposer les achats sans gêner (jamais pendant le tutoriel).
+6. Récompenses gratuites : quotidiennes, temps de jeu, groupe Roblox, favoris.
+7. Indicateurs à suivre : rétention J1 et J7, temps de session, conversion, revenu moyen, et lesquels regarder en premier.
+
+LIVRABLE : tableau des produits (nom, type, prix, effet, description boutique) + règles d'équilibre de l'économie.`},
+   {id:"qa",name:"Testeur (QA)",phase:"Phase 4 — quand une version est jouable",why:"Trouve les bugs avant les joueurs.",prompt:head("le testeur QA")+`TA MISSION
+1. Écris un plan de test complet : chaque système (${LD.systems.join(" ; ")}), chaque écran, chaque achat.
+2. Tests multi-joueurs : lance un serveur local avec plusieurs joueurs dans Roblox Studio (onglet Test) et liste ce qu'il faut vérifier (synchronisation, vol, échanges, déconnexions).
+3. Tests de sauvegarde : quitter et revenir, quitter pendant un achat, serveur qui se ferme.
+4. Tests téléphone : émulateur de Studio (plusieurs tailles d'écran) puis vrai téléphone. Lisibilité, boutons, performance.
+5. Tentatives de triche simples à vérifier : envoyer de fausses valeurs aux RemoteEvents, se téléporter, cliquer trop vite.
+6. Performance : utiliser le MicroProfiler et les statistiques de Studio, avec des seuils à respecter.
+7. Format de rapport de bug : étapes, résultat attendu, résultat obtenu, gravité.
+
+LIVRABLE : la checklist de test (cases à cocher) + le modèle de rapport de bug.`},
+   {id:"launch",name:"Lancement et mises à jour",phase:"Phase 5 — avant la sortie",why:"Prépare la page du jeu et le calendrier des mises à jour.",prompt:head("le responsable du lancement et des mises à jour")+`TA MISSION
+1. Titre : 5 propositions avec le mot-clé principal dans les 3 premiers mots (les joueurs sur téléphone tapent 1 à 2 mots et utilisent l'autocomplétion). Garde « ${I.title} » comme première piste.
+2. Description de la page du jeu : courte, avec les mots-clés de la recette et du thème, ce qu'on fait dans le jeu, et une section « Nouveautés ».
+3. Icône et miniatures : reprends le brief du DA et ajoute une version « mise à jour » (avec tag comme [UPD] ou un emoji de saison) pour les grosses mises à jour.
+4. Date de sortie : ${seasonText()}
+5. Calendrier de mises à jour sur 8 semaines : une petite mise à jour chaque semaine (même jour à chaque fois) et une grosse toutes les 3 à 4 semaines, avec un événement de saison.
+6. Communauté : groupe Roblox, récompense pour rejoindre le groupe, codes promo, et comment annoncer les mises à jour.
+7. Ce qu'il faut surveiller la première semaine dans les statistiques de Roblox (Creator Hub → Analytics) et quoi faire si la rétention est faible.
+
+LIVRABLE : textes prêts à copier (titre, description) + calendrier de mises à jour + checklist du jour de sortie.`}
+  ];
+}
+function renderPlan(){
+  const el=$("#planOut");const I=currentChosen();
+  if(!I){el.innerHTML=`<div class="note">Aucune idée choisie pour l'instant. Va dans <a href="#idees">Idées de jeux</a> ou <a href="#mon-idee">Mon idée</a> et appuie sur « Choisir ».</div>`;return}
+  const AG=agents(I);PLAN=AG;
+  el.innerHTML=`<div class="idea"><span class="stamp">Idée choisie · ${esc(gname(I.genre))} · ${esc(LOOPS[I.loop.k].name)} · ${esc(I.T.label)}</span>
+    <div class="title">${esc(I.title)}</div><p class="pitch">${esc(pitchOf(I))}</p>
+    <div class="src">Potentiel ${I.score}/100 · ${projectSize(I.loop.k)}</div></div>
+   <div class="card"><h3>Comment utiliser ce plan</h3>
+    <ol class="list"><li>Ouvre une conversation séparée pour chaque agent (une par rôle), par exemple avec Claude.</li>
+    <li>Copie le prompt de l'agent et colle-le. Chaque prompt contient déjà tout le brief du jeu.</li>
+    <li>Suis l'ordre des phases : le chef de projet d'abord, puis le DA et le game designer, puis les autres.</li>
+    <li>Quand un agent a fini, colle son résultat dans la conversation des agents qui en dépendent (par exemple : le guide du DA → modélisateur 3D, level designer et programmeur interface ; les chiffres du game designer → programmeur serveur et économie).</li>
+    <li>Les modèles se font dans Blender, les sons viennent uniquement de la bibliothèque Roblox : c'est écrit dans chaque prompt.</li></ol>
+    <div class="controls"><button class="primary" id="copyAll">Copier tous les prompts</button><button id="copyBrief">Copier le brief seul</button><span class="src" id="planMsg" role="status"></span></div></div>
+   <details class="card"><summary><b>Le brief commun</b> (inclus dans chaque prompt)</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--mono);margin:0">${esc(brief(I))}</pre></details>
+   ${AG.map((a,i)=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:start">
+      <div><span class="stamp">${esc(a.phase)}</span><h3>Agent ${i+1} · ${esc(a.name)}</h3><p class="src" style="margin:2px 0 0">${esc(a.why)}</p></div>
+      <div class="controls"><button data-copy="${i}">Copier le prompt</button></div></div>
+      <details><summary class="src">Voir le prompt</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--mono);margin:8px 0 0">${esc(a.prompt)}</pre></details></div>`).join("")}
+   <div class="card"><h3>Ajouter un agent</h3><p class="src" style="margin:0">Besoin d'un rôle en plus (animateur, scénariste, traducteur…) ? Écris-le ici et le site prépare son prompt avec le brief.</p>
+    <div class="controls"><label for="extraRole">Rôle <input type="text" id="extraRole" placeholder="ex. animateur des personnages"></label><label for="extraTask" style="flex:1;min-width:220px">Ce qu'il doit faire <input type="text" id="extraTask" style="width:100%" placeholder="ex. les animations de marche, d'attaque et de victoire"></label><button id="extraGo">Créer le prompt</button></div>
+    <div id="extraOut"></div></div>`;
+  const msg=t=>{$("#planMsg").textContent=t};
+  const copy=async(txt,m)=>{try{await navigator.clipboard.writeText(txt);msg(m)}catch{msg("Le navigateur a bloqué la copie : ouvre « Voir le prompt » et sélectionne le texte.")}};
+  $("#copyAll").onclick=()=>copy(AG.map((a,i)=>`===== AGENT ${i+1} · ${a.name} (${a.phase}) =====\n\n${a.prompt}`).join("\n\n\n"),"Les "+AG.length+" prompts sont copiés.");
+  $("#copyBrief").onclick=()=>copy(brief(I),"Brief copié.");
+  el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{const a=AG[+b.dataset.copy];copy(a.prompt,`Prompt « ${a.name} » copié.`);b.textContent="Copié ✓";setTimeout(()=>b.textContent="Copier le prompt",1800)});
+  $("#extraGo").onclick=()=>{const r=$("#extraRole").value.trim(),t=$("#extraTask").value.trim();if(!r){$("#extraOut").innerHTML=`<p class="src">Écris d'abord le rôle.</p>`;return}
+    const p=`Tu es ${r} dans une petite équipe qui crée un jeu Roblox. Lis d'abord le brief ci-dessous, puis fais ta mission. Réponds en français. Si une information te manque, fais un choix raisonnable et écris-le dans une section « Hypothèses ».\n\n${brief(I)}\n\nTA MISSION\n${t||"Fais tout ce qui relève de ton rôle pour ce jeu, étape par étape, en respectant les règles de production du brief."}\nDétaille chaque étape pour qu'on puisse la faire dans Roblox Studio (et dans Blender s'il s'agit de 3D ou d'animation).\n\nLIVRABLE : un document précis, découpé en étapes, prêt à être utilisé par le reste de l'équipe.`;
+    $("#extraOut").innerHTML=`<div class="controls" style="margin-top:8px"><button id="extraCopy">Copier ce prompt</button></div><pre style="white-space:pre-wrap;font:13px/1.5 var(--mono)">${esc(p)}</pre>`;
+    $("#extraCopy").onclick=()=>copy(p,"Prompt copié.")};
+}
+let PLAN=[];
+
+/* ---------- Branchements ---------- */
+document.getElementById("ideaOut").addEventListener("click",e=>{
+  const inf=e.target.closest("[data-info]"),ch=e.target.closest("[data-choose]");
+  if(inf){const i=+inf.dataset.info,box=document.getElementById("info-"+i);if(box.innerHTML){box.innerHTML="";inf.textContent="Info"}else{box.innerHTML=infoHTML(CURRENT[i]);inf.textContent="Masquer"}}
+  if(ch)chooseIdea(CURRENT[+ch.dataset.choose]);
+});
+document.getElementById("myGo").onclick=rateMyIdea;
+document.getElementById("myText").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))rateMyIdea()});
+window.addEventListener("hashchange",()=>{if(location.hash==="#plan")renderPlan()});
+window.LABO_AFTER_LOAD=()=>{IDF=null;if(location.hash==="#plan")renderPlan()};
