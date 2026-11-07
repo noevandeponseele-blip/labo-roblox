@@ -235,70 +235,121 @@ function similarGames(text,I){
 const FR_EN={chat:"Cat",chats:"Cat",chien:"Dog",chiens:"Dog",lapin:"Bunny",oeuf:"Egg",oeufs:"Egg",poisson:"Fish",poissons:"Fish",voiture:"Car",voitures:"Car",maison:"House",ville:"City",monstre:"Monster",monstres:"Monster",fantome:"Ghost",citron:"Lemon",gateau:"Cake",bonbon:"Candy",bonbons:"Candy",robot:"Robot",robots:"Robot",ninja:"Ninja",epee:"Sword",cheval:"Horse",licorne:"Unicorn",requin:"Shark",singe:"Monkey",ours:"Bear",loup:"Wolf",renard:"Fox",tigre:"Tiger",lion:"Lion",pingouin:"Penguin",pizza:"Pizza",burger:"Burger",fusee:"Rocket",planete:"Planet",zombie:"Zombie",zombies:"Zombie",sorciere:"Witch",magicien:"Wizard",pirate:"Pirate",pirates:"Pirate",tresor:"Treasure",ile:"Island",prison:"Prison",ecole:"School",hopital:"Hospital",dragon:"Dragon",dragons:"Dragon",dino:"Dino",dinosaure:"Dino",slime:"Slime",banane:"Banana",pomme:"Apple",neige:"Snow",sapin:"Tree",abeille:"Bee",abeilles:"Bee",fourmi:"Ant",araignee:"Spider",serpent:"Snake",vache:"Cow",cochon:"Pig",poule:"Chicken",canard:"Duck",capybara:"Capybara",axolotl:"Axolotl",chevalier:"Knight",chateau:"Castle",avion:"Plane",bateau:"Boat",train:"Train",tank:"Tank",soldat:"Soldier",policier:"Cop",voleur:"Thief",cuisinier:"Chef",restaurant:"Restaurant",magasin:"Shop",diamant:"Diamond",or:"Gold",cristal:"Crystal",potion:"Potion",cadeau:"Gift",pere:"",noel:"Santa"};
 const unacc=w=>w.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/œ/g,"oe");
 function nounFrom(raw){if(!IDF)buildIdf();const c={};const words=norm(raw).match(/[a-zà-ÿ0-9]+/g)||[];
-  words.forEach((w,i)=>{const u=unacc(w);let n=null;if(FR_EN[u])n=FR_EN[u];else if(u.length>=4&&IDF[u]!==undefined&&IDF[u]>1.5&&!/^(avec|dans|pour|plus|tous|tout|leur|elle|sont|fait|faire|game|jeux|play|joueur|joueurs|peut|peuvent)$/.test(u))n=u[0].toUpperCase()+u.slice(1);
+  words.forEach((w,i)=>{const u=unacc(w);let n=null;if(FR_EN[u])n=FR_EN[u];else if(u.length>=4&&IDF[u]!==undefined&&IDF[u]>1.5&&!/^(avec|dans|pour|plus|tous|tout|leur|elle|sont|fait|faire|game|games|jeux|play|joueur|joueurs|peut|peuvent|super|mega|ultra|best|simulator|tycoon|obby|roblox|world|life|real|realistic|ultimate|epic|legends?|evolution|battle|battles|arena|escape|survive|steal|grow|build|feed|throw|catch|duels?|tower|race)$/.test(u))n=u[0].toUpperCase()+u.slice(1);
     if(n){c[n]=c[n]||{n:0,i};c[n].n++}});
   const best=Object.entries(c).sort((a,b)=>b[1].n-a[1].n||a[1].i-b[1].i)[0];return best?best[0]:null}
-/* ---------- Noter MON idée ---------- */
-function rateMyIdea(){
-  const raw=$("#myText").value.trim();const out=$("#myOut");
-  if(raw.length<15){out.innerHTML=`<p class="src">Décris ton idée en une ou deux phrases (au moins 15 caractères) : ce que fait le joueur, le thème, ce qui la rend différente.</p>`;return}
-  const t=norm(raw);
-  const loopHits=Object.keys(LOOPS).filter(k=>LOOPS[k].re.test(t)||FR_LOOP[k]?.test(t));
-  const themeHits=Object.keys(THEMES).filter(k=>THEMES[k].re.test(t)||FR_THEME[k]?.test(t));
-  const pos=k=>{const m=[LOOPS[k].re.exec(t),FR_LOOP[k]?.exec(t)].filter(Boolean).map(x=>x.index);return m.length?Math.min(...m):1e9};
-  loopHits.sort((a,b)=>pos(a)-pos(b));
-  const loopK=loopHits[0]||"collect";
-  themeHits.sort((a,b)=>{const p=k=>{const m=[THEMES[k].re.exec(t),FR_THEME[k]?.exec(t)].filter(Boolean).map(x=>x.index);return m.length?Math.min(...m):1e9};return p(a)-p(b)});
-  const thK=themeHits[0]||[...A.themes].sort((a,b)=>b.lift-a.lift)[0].k;
-  const twist="les éléments décrits par le créateur";
-  const myNoun=nounFrom(raw)||THEMES[thK].nouns[0];
-  const titles=LOOPS[loopK].titles.map(x=>fixA(x.replace("{N}",myNoun)));
-  const titleGuess=titles[0];
-  const I=buildIdea({loopK,thK,twist,title:titleGuess,noun:myNoun,text:raw});
-  const sims=similarGames(raw,I).slice(0,6);
-  const bigSim=sims.filter(g=>g.p>50000);
-  // Améliorations
-  const tips=[];const has=re=>re.test(t);
-  if(!loopHits.length)tips.push(["Dis ce que le joueur fait en boucle","Je n'ai pas reconnu d'action répétée (collectionner, voler, survivre, combattre…). Une bonne idée Roblox tient en une phrase : « le joueur fait X pour obtenir Y, puis Z ».","bad"]);
-  if(loopHits.length>2)tips.push(["Choisis une boucle principale",`Ton idée mélange ${loopHits.length} recettes (${loopHits.map(k=>LOOPS[k].name.toLowerCase()).join(", ")}). Garde-en une au centre, les autres en bonus, sinon le joueur ne comprend pas quoi faire.`,"warn"]);
-  if(I.loop.n>=90)tips.push(["Recette très encombrée",`${I.loop.n} jeux du top 1000 utilisent déjà « ${LOOPS[loopK].name.toLowerCase()} ». Ajoute un twist clair, par exemple ${TWISTS[Math.floor(Math.random()*TWISTS.length)]}.`,"warn"]);
-  if(!themeHits.length){const r=[...A.themes].sort((a,b)=>b.lift-a.lift).slice(0,3);tips.push(["Donne un thème qui se voit",`Aucun thème reconnu. Les thèmes qui montent en ce moment : ${r.map(x=>THEMES[x.k].label.toLowerCase()).join(", ")}.`,"warn"])}
-  else if(I.th.lift<0.8)tips.push(["Thème plutôt calme",`« ${THEMES[thK].label} » n'est pas en hausse chez les jeux récents. Ça peut marcher si tu le rends très visible, ou combine-le avec ${[...A.themes].sort((a,b)=>b.lift-a.lift)[0]&&THEMES[[...A.themes].sort((a,b)=>b.lift-a.lift)[0].k].label.toLowerCase()}.`,"warn"]);
-  if(!has(/ami|amis|ensemble|coop|multi|joueurs|[ée]quipe|[ée]chang|trade|friend|team|vol/))tips.push(["Rends-le social","Les gros jeux Roblox se jouent avec les autres : échanges, coop, vol, compétition, classement. Dis ce que les joueurs font ensemble.","warn"]);
-  if(!has(/am[ée]lior|niveau|d[ée]bloqu|upgrade|rebirth|collection|rare|[ée]volu|level|unlock/))tips.push(["Ajoute une progression","Qu'est-ce qui pousse à revenir demain ? Améliorations, niveaux, raretés à collectionner, rebirth…","warn"]);
-  if(!has(/gagn|survi|finir|fin\b|objectif|manche|record|classement|win|round/))tips.push(["Donne un objectif court","Chaque session doit avoir un but visible (tenir 5 minutes, finir l'étape, battre le record).","warn"]);
-  if(!has(/mobile|t[ée]l[ée]phone|tactile|phone/))tips.push(["Pense téléphone d'abord","La majorité des joueurs Roblox sont sur mobile : prévois des gros boutons et des contrôles simples dès le départ.",""]);
-  if(!has(/game ?pass|robux|boutique|acheter|vendre|pass\b/))tips.push(["Prévois comment le jeu rapporte",`Pour cette recette : ${LOOP_DESIGN[loopK].money.slice(0,3).join(" ; ")}.`,""]);
-  if(bigSim.length)tips.push(["Différencie-toi de jeux déjà gros",`Ton idée ressemble à ${bigSim.slice(0,2).map(g=>`<a href="${gameUrl(g)}">${esc(g.tn)}</a> (${fmtK(g.p)} joueurs)`).join(" et ")}. Dis en une phrase ce que ton jeu fait que ceux-là ne font pas.`,"warn"]);
-  tips.push(["Timing",seasonText(),""]);
+/* ---------- Noter MON idée (fiche détaillée) ---------- */
+const SOCIAL=[["coop","Coopération"],["pvp","Combat / compétition"],["trade","Échanges"],["steal","Vol entre joueurs"],["rank","Classement"],["rp","Roleplay"]];
+const MONEY=[["gp","Game passes"],["dp","Achats répétables"],["cos","Cosmétiques"],["season","Pass de saison"],["rng","Objets aléatoires payants"],["none","Rien pour l'instant"]];
+const PLAT=[["mobile","Téléphone"],["pc","Ordinateur"],["console","Console"],["vr","VR"]];
+const FIELDS=["fName","fUniverse","fGenre","fLoop","fTheme","fCore","fGoal","fProg","fUnique","fTeam"];
+const ticks=(id,list,name)=>{document.getElementById(id).innerHTML=list.map(([v,l])=>`<label class="tick"><input type="checkbox" name="${name}" value="${v}"> ${esc(l)}</label>`).join("")};
+const checked=name=>[...document.querySelectorAll(`input[name="${name}"]:checked`)].map(x=>x.value);
+let FORM_READY=false;
+function setupForm(){
+  if(FORM_READY)return;FORM_READY=true;
+  ticks("fSocial",SOCIAL,"soc");ticks("fMoney",MONEY,"mon");ticks("fPlat",PLAT,"plat");
+  $("#fGenre").innerHTML+=[...A.big].sort((a,b)=>b.n-a.n).map(s=>`<option value="${esc(s.k)}">${esc(gname(s.k))}</option>`).join("");
+  $("#fLoop").innerHTML+=Object.entries(LOOPS).map(([k,l])=>`<option value="${k}">${esc(l.name)}</option>`).join("");
+  $("#fTheme").innerHTML+=Object.entries(THEMES).map(([k,t])=>`<option value="${k}">${esc(t.label)}</option>`).join("")+`<option value="autre">Autre (mon univers)</option>`;
+  const d=store.get("labo-form");
+  if(d){FIELDS.forEach(f=>{if(d[f]!=null)document.getElementById(f).value=d[f]});[["soc",d.soc],["mon",d.mon],["plat",d.plat]].forEach(([n,v])=>(v||[]).forEach(x=>{const el=document.querySelector(`input[name="${n}"][value="${x}"]`);if(el)el.checked=true}))}
+  else document.querySelector('input[name="plat"][value="mobile"]').checked=true;
+  const f=$("#myForm");
+  f.addEventListener("input",saveForm);f.addEventListener("change",saveForm);
+  f.addEventListener("submit",e=>{e.preventDefault();rateForm()});
+  $("#fExample").onclick=()=>{const ex={fName:"Feed the Dragon",fUniverse:"dragons, île volcanique",fGenre:"",fLoop:"throwfeed",fTheme:"",fCore:"Le joueur lance de la nourriture à son bébé dragon. Le dragon grandit à chaque palier et pond des œufs qui rapportent de l'or chaque seconde. Avec l'or, il achète de meilleure nourriture et agrandit son nid.",fGoal:"Faire évoluer son dragon au stade suivant avant la tombée de la nuit (8 minutes).",fProg:"10 stades d'évolution, 30 dragons à collectionner avec des mutations rares, récompense quotidienne, rebirth avec multiplicateur.",fUnique:"La nuit, les autres joueurs peuvent entrer dans ton nid pour voler tes œufs : il faut défendre son nid avec son dragon.",fTeam:"small"};
+    FIELDS.forEach(k=>document.getElementById(k).value=ex[k]);document.querySelectorAll('#myForm input[type=checkbox]').forEach(x=>x.checked=["trade","steal","rank","gp","dp","cos","mobile","pc"].includes(x.value));saveForm();rateForm()};
+  $("#fClear").onclick=()=>{FIELDS.forEach(k=>{const el=document.getElementById(k);el.value=el.tagName=="SELECT"?el.options[0].value:""});document.querySelectorAll('#myForm input[type=checkbox]').forEach(x=>x.checked=x.value=="mobile");saveForm();$("#myOut").innerHTML=""};
+  if(d&&d.fCore)rateForm();
+}
+function saveForm(){const d={};FIELDS.forEach(f=>d[f]=document.getElementById(f).value);d.soc=checked("soc");d.mon=checked("mon");d.plat=checked("plat");store.set("labo-form",d)}
+const words=t=>(t.trim().match(/\S+/g)||[]).length;
+const hasAny=(t,re)=>re.test(norm(t));
+function bandLen(t,a,b){const w=words(t);return w>=b?1:w>=a?.6:w>0?.3:0}
+
+function rateForm(){
+  const v=id=>document.getElementById(id).value.trim();
+  const name=v("fName"),uni=v("fUniverse"),core=v("fCore"),goal=v("fGoal"),prog=v("fProg"),uniq=v("fUnique"),team=v("fTeam");
+  const soc=checked("soc"),mon=checked("mon"),plat=checked("plat");
+  const out=$("#myOut");
+  if(!name&&!core){out.innerHTML=`<div class="note">Donne au moins un nom et décris ce que fait le joueur pour avoir une note.</div>`;return}
+  const all=norm([name,uni,core,goal,prog,uniq].join(" . "));
+  // recette et thème : choix de l'utilisateur, sinon détection
+  const pos=(re,t)=>{const m=re&&re.exec(t);return m?m.index:1e9};
+  let loopK=v("fLoop");const loopAuto=!loopK;
+  const coreN=norm(core+" "+name);
+  const loopHits=Object.keys(LOOPS).filter(k=>LOOPS[k].re.test(all)||FR_LOOP[k]?.test(all)).sort((a,b)=>Math.min(pos(LOOPS[a].re,coreN),pos(FR_LOOP[a],coreN))-Math.min(pos(LOOPS[b].re,coreN),pos(FR_LOOP[b],coreN)));
+  if(!loopK)loopK=loopHits[0]||"collect";
+  let thK=v("fTheme");const themeAuto=!thK||thK=="autre";
+  const themeHits=Object.keys(THEMES).filter(k=>THEMES[k].re.test(all)||FR_THEME[k]?.test(all));
+  if(themeAuto)thK=themeHits[0]||[...A.themes].sort((a,b)=>b.lift-a.lift)[0].k;
+  const noun=nounFrom(name+" "+uni+" "+core)||THEMES[thK].nouns[0];
+  const text=[core&&`Ce que fait le joueur : ${core}`,goal&&`Objectif d'une partie : ${goal}`,prog&&`Progression : ${prog}`,uniq&&`Ce qui le rend différent : ${uniq}`,uni&&`Univers : ${uni}`,soc.length&&`Avec les autres joueurs : ${soc.map(x=>SOCIAL.find(s=>s[0]==x)[1].toLowerCase()).join(", ")}`,mon.length&&`Monétisation prévue : ${mon.map(x=>MONEY.find(s=>s[0]==x)[1].toLowerCase()).join(", ")}`,plat.length&&`Plateformes : ${plat.map(x=>PLAT.find(s=>s[0]==x)[1].toLowerCase()).join(", ")}`].filter(Boolean).join("\n");
+  const I=buildIdea({loopK,genre:v("fGenre")||null,thK,twist:"les éléments décrits par le créateur",title:name||LOOPS[loopK].titles[0].replace("{N}",noun),noun,text});
+  const sims=similarGames([name,uni,core,uniq].join(" "),I);
+  const maxN=Math.max(...A.loops.map(l=>l.n)),maxNew=Math.max(...A.loops.map(l=>l.newN));
+  const C=[];const add=(group,label,max,score,why,tip)=>C.push({group,label,max,score:Math.max(0,Math.min(max,Math.round(score))),why,tip});
+  // ---- MARCHÉ (40)
+  const gsx=I.gsx;
+  add("Marché","Place dans le genre",12,gsx?gsx.pot/100*12:5,gsx?`En ${gname(I.genre)}, le jeu médian du top a ${fr(gsx.med)} joueurs et ${pct(gsx.newShare)} des jeux ont moins de 90 jours (${gsx.n} jeux dans le top 1000).`:"Genre peu présent dans le top 1000.",gsx&&gsx.pot<40?`Ce genre est difficile en ce moment. Les genres les plus ouverts : ${[...A.big].sort((a,b)=>b.pot-a.pot).slice(0,3).map(s=>gname(s.k)).join(", ")}.`:"");
+  const noLoop=loopAuto&&!loopHits.length,noTheme=themeAuto&&!themeHits.length&&!uni;
+  add("Marché","Recette qui perce",12,noLoop?0:I.loop.newN/maxNew*12,noLoop?"Aucune recette reconnue dans ta fiche : choisis-en une dans la liste ou décris mieux ce que fait le joueur.":`« ${LOOPS[loopK].name} » : ${I.loop.n} jeux dans le top, dont ${I.loop.newN} créés il y a moins de 90 jours.${loopAuto?" (recette détectée dans ton texte)":""}`,noLoop?"Choisis la recette principale dans la liste en haut de la fiche.":I.loop.newN/maxNew<.4?"Peu de jeux récents percent avec cette recette : ajoute une deuxième mécanique plus en vogue en bonus.":"");
+  add("Marché","Thème qui monte",8,noTheme?0:Math.min(1,I.th.lift/2)*8,noTheme?"Aucun thème ni univers donné.":`« ${THEMES[thK].label} » est ${I.th.lift>=1.3?`${I.th.lift.toFixed(1).replace(".",",")} fois plus présent chez les jeux récents ou en tendance`:I.th.lift>=.8?"stable":"plutôt en baisse"}.${themeAuto?" (thème détecté)":""}`,I.th.lift<1?`Les thèmes qui montent : ${[...A.themes].sort((a,b)=>b.lift-a.lift).slice(0,3).map(x=>THEMES[x.k].label.toLowerCase()).join(", ")}.`:"");
+  const bigClone=sims.slice(0,5).filter(g=>g.p>30000);
+  add("Marché","Concurrence directe",8,noLoop?2:8-I.loop.n/maxN*5-Math.min(3,bigClone.length),`${I.sameTheme.length} jeu${I.sameTheme.length>1?"x":""} du top combine${I.sameTheme.length>1?"nt":""} déjà cette recette et ce thème.${bigClone.length?` Proches et déjà gros : ${bigClone.slice(0,2).map(g=>`${g.tn} (${fmtK(g.p)})`).join(", ")}.`:""}`,bigClone.length?"Écris clairement ce que ton jeu fait que ces jeux-là ne font pas, et mets-le dans ton titre ou ton icône.":"");
+  // ---- CONCEPTION (60)
+  const verbs=/lanc|nourri|vol|collect|constru|combat|tir|surviv|cours|saut|p[êe]ch|achet|vend|am[ée]lior|ouvr|fuir|cach|d[ée]fend|explor|throw|feed|steal|build|fight|shoot|run|jump|catch|buy|sell|upgrade|hatch|grow/;
+  add("Conception","Boucle de jeu claire",10,bandLen(core,15,35)*8+(hasAny(core,verbs)?2:0),core?`${words(core)} mots. ${hasAny(core,verbs)?"Les actions du joueur sont claires.":"On ne voit pas bien l'action que le joueur répète."}`:"Pas encore décrite.",words(core)<35?"Décris la boucle en 3 temps : le joueur fait X → il obtient Y → il dépense Y pour faire X mieux.":"");
+  add("Conception","Objectif d'une partie",7,bandLen(goal,6,15)*5+(hasAny(goal,/\d|avant|survi|gagn|finir|atteindre|battre|record|manche|win|reach|before/)?2:0),goal?`${words(goal)} mots.`:"Pas d'objectif court décrit.",!goal||words(goal)<6?"Donne un but visible pour une session de 5 à 15 minutes (atteindre un palier, survivre jusqu'au matin, finir la manche).":"");
+  const progKw=(norm(prog).match(/niveau|am[ée]lior|d[ée]bloqu|rare|collection|collectionn|[ée]volu|rebirth|quotidien|journali|saison|stade|monde|zone|upgrade|unlock|level|daily/g)||[]).length;
+  add("Conception","Progression (revenir demain)",10,bandLen(prog,6,18)*6+Math.min(4,progKw*1.5),prog?`${progKw} mécanique(s) de progression repérée(s).`:"Rien qui fait revenir le joueur.",progKw<2?"Ajoute au moins deux raisons de revenir : paliers ou niveaux, collection à compléter, récompense quotidienne, événements.":"");
+  add("Conception","Jouer avec les autres",10,[0,5,8,10][Math.min(3,soc.length)],soc.length?`${soc.length} façon(s) de jouer ensemble.`:"Aucune interaction entre joueurs cochée.",soc.length<2?"Les gros jeux Roblox sont sociaux : ajoute des échanges, du vol, de la coop ou un classement visible.":"");
+  const uniqWords=words(uniq),overlap=bigClone.length;
+  add("Conception","Ce qui te rend différent",10,(uniqWords>=18?7:uniqWords>=8?5:uniqWords>0?2:0)+(I.sameTheme.length<=3?3:I.sameTheme.length<=10?1.5:0)-(overlap>=2?2:0),uniq?`${I.sameTheme.length<=3?"Combinaison rare dans le top 1000.":`${I.sameTheme.length} jeux du top combinent déjà cette recette et ce thème.`}`:"Rien d'écrit : c'est le point le plus important.",uniqWords<8?"Écris en une ou deux phrases la chose que ton jeu est le seul à faire. C'est ce qui donnera envie de cliquer.":"");
+  const monOk=mon.length&&!mon.includes("none");
+  add("Conception","Monétisation et téléphone",6,(monOk?3:mon.includes("none")?1:0)+(plat.includes("mobile")?3:0)-(mon.includes("rng")?0:0),`${monOk?mon.length+" source(s) de revenus":"Pas de monétisation prévue"} · ${plat.includes("mobile")?"pensé pour téléphone":"téléphone non coché"}.`,[!plat.includes("mobile")?"La majorité des joueurs sont sur téléphone : coche-le et prévois de gros boutons.":"",!monOk?`Idées pour cette recette : ${LOOP_DESIGN[loopK].money.slice(0,3).join(" ; ")}.`:"",mon.includes("rng")?"Objets aléatoires payants : Roblox impose d'afficher les probabilités.":""].filter(Boolean).join(" "));
+  // nom
+  let nScore=0;const nameTips=[];const nw=words(name);
+  const exact=name&&G.find(g=>norm(g.tn)===norm(name));
+  if(name){nScore+=2;if(!exact)nScore+=1;else nameTips.push(`« ${exact.tn} » existe déjà (#${exact.rank} du top) : change de nom.`);
+    const first3=name.split(/\s+/).slice(0,3).join(" ");const kw=Object.values(LOOPS).some(l=>l.re.test(first3))||Object.values(THEMES).some(t=>t.re.test(first3));
+    if(kw)nScore+=2;else nameTips.push("Mets un mot que les joueurs cherchent (Steal, Grow, Escape, Dragon, Pet…) dans les 3 premiers mots.");
+    if(nw<=5)nScore+=1;else nameTips.push("Raccourcis : 2 à 5 mots, c'est ce qui marche dans le top.");
+    if(!/[àâçéèêëîïôûùœ]/i.test(name)&&!/\b(le|la|les|des|du|un|une|et)\b/i.test(name))nScore+=1;else nameTips.push("La plupart des joueurs cherchent en anglais : un titre en anglais touchera plus de monde.");}
+  else nameTips.push("Donne un nom à ton jeu.");
+  add("Conception","Nom du jeu",7,nScore,name?`« ${name} »`:"Pas de nom.",nameTips.join(" "));
+  const total=C.reduce((s,c)=>s+c.score,0);I.score=total;
+  const verdict=total>=75?["Excellente base","good"]:total>=60?["Idée solide","good"]:total>=45?["À retravailler","warn"]:["Encore fragile","bad"];
+  const prios=[...C].filter(c=>c.tip).sort((a,b)=>a.score/a.max-b.score/b.max).slice(0,3);
+  const big=["rp","shooter","survive","td","build"].includes(loopK);
+  const titles=[...new Set(LOOPS[loopK].titles.map(x=>fixA(x.replace("{N}",noun))))];
   MY=I;
+  const crit=c=>`<div class="crit"><div><b>${esc(c.label)}</b></div><div class="why"><div class="meter" style="margin:6px 0"><i style="width:${c.score/c.max*100}%;background:${c.score/c.max>=.7?"var(--good)":c.score/c.max>=.4?"var(--warn)":"var(--bad)"}"></i></div><div class="src">${esc(c.why)}</div>${c.tip?`<div class="src" style="color:var(--ink);margin-top:3px">→ ${esc(c.tip)}</div>`:""}</div><div class="n" style="font:600 15px var(--mono);text-align:right">${c.score}/${c.max}</div></div>`;
   out.innerHTML=`<article class="idea">
    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:start">
-    <div class="grid" style="gap:6px"><span class="stamp">Ton idée · ${esc(gname(I.genre))} · ${esc(LOOPS[loopK].name)} · ${esc(THEMES[thK].label)}</span><div class="title">${esc(titleGuess)}</div><p class="pitch src" style="font-size:14px">« ${esc(raw)} »</p></div>
-    <div style="text-align:right"><div class="bignum">${I.score}</div><div class="src">potentiel /100</div></div>
+    <div class="grid" style="gap:6px"><span class="stamp">Ta fiche · ${esc(gname(I.genre))} · ${esc(LOOPS[loopK].name)} · ${esc(themeAuto&&uni?uni:THEMES[thK].label)}</span><div class="title">${esc(name||"Sans nom")}</div><div><span class="chip ${verdict[1]}">${verdict[0]}</span></div></div>
+    <div style="text-align:right"><div class="bignum">${total}</div><div class="src">sur 100</div></div>
    </div>
-   <div class="scorebar">
-    <div>Place dans le genre<b>${I.parts.sGenre}/30</b><div class="meter"><i style="width:${I.parts.sGenre/30*100}%"></i></div></div>
-    <div>Recette qui perce<b>${I.parts.sLoop}/25</b><div class="meter"><i style="width:${I.parts.sLoop/25*100}%"></i></div></div>
-    <div>Thème qui monte<b>${I.parts.sTheme}/20</b><div class="meter"><i style="width:${I.parts.sTheme/20*100}%"></i></div></div>
-    <div>Bonus saison<b>${I.parts.sSeason}/10</b><div class="meter"><i style="width:${I.parts.sSeason/10*100}%"></i></div></div>
-    <div>Concurrence<b>−${I.parts.sat}</b><div class="meter"><i style="width:${I.parts.sat/20*100}%;background:var(--bad)"></i></div></div>
-   </div>
-   <div class="src">Reconnu dans ton texte : ${loopHits.length?loopHits.map(k=>`<span class="chip">${esc(LOOPS[k].name)}</span>`).join(" "):"<span class='chip bad'>aucune recette</span>"} ${themeHits.map(k=>`<span class="chip hot">${esc(THEMES[k].label)}</span>`).join(" ")}</div>
-   <div><b>Comment l'améliorer</b>
-    <div class="grid" style="gap:8px;margin-top:8px">${tips.map(([h,b,c])=>`<div class="card" style="padding:10px 12px;gap:4px;border-left:3px solid ${c=="bad"?"var(--bad)":c=="warn"?"var(--warn)":"var(--line)"}"><b>${esc(h)}</b><span class="src" style="font-size:13px">${b}</span></div>`).join("")}</div></div>
-   <div><b>Titres possibles</b> (mot-clé dans les 3 premiers mots ; le premier sert de titre provisoire) <div class="kv" style="margin-top:6px">${titles.map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div></div>
+   ${prios.length?`<div class="card" style="gap:6px;border-left:3px solid var(--warn)"><b>Tes 3 priorités pour gagner des points</b><ol class="list">${prios.map(c=>`<li><b>${esc(c.label)}</b> (${c.score}/${c.max}) : ${esc(c.tip)}</li>`).join("")}</ol></div>`:""}
+   ${big&&team=="solo"?`<div class="note">Attention : « ${esc(LOOPS[loopK].name)} » est un gros projet (${esc(projectSize(loopK))}). Seul, commence par une version très réduite, ou utilise le plan multi-agents.</div>`:""}
+   <div><b>Marché</b> <span class="src">· ${C.filter(c=>c.group=="Marché").reduce((s,c)=>s+c.score,0)}/40, calculé sur le top 1000 du moment</span>${C.filter(c=>c.group=="Marché").map(crit).join("")}</div>
+   <div><b>Conception</b> <span class="src">· ${C.filter(c=>c.group=="Conception").reduce((s,c)=>s+c.score,0)}/60, calculé sur ta fiche</span>${C.filter(c=>c.group=="Conception").map(crit).join("")}</div>
+   <div><b>Jeux du top 1000 les plus proches</b><div class="kv" style="margin-top:6px">${sims.slice(0,8).map(g=>`<a class="chip" href="${gameUrl(g)}">#${g.rank} ${esc(g.tn)} · ${fmtK(g.p)}</a>`).join("")||"<span class='src'>Aucun : c'est une niche.</span>"}</div></div>
+   ${!name||nameTips.length?`<div><b>Idées de nom</b><div class="kv" style="margin-top:6px">${titles.map(x=>`<button type="button" class="chip" data-usename="${esc(x)}" style="border:0;cursor:pointer">${esc(x)}</button>`).join("")}</div><div class="src" style="margin-top:4px">Appuie sur un nom pour l'utiliser.</div></div>`:""}
    <div class="controls"><button data-myinfo>Info</button><button class="primary" data-mychoose>Choisir cette idée</button></div>
    <div id="myInfo"></div>
   </article>`;
+  out.querySelectorAll("[data-usename]").forEach(b=>b.onclick=()=>{$("#fName").value=b.dataset.usename;saveForm();rateForm()});
   out.querySelector("[data-myinfo]").onclick=e=>{const box=$("#myInfo");if(box.innerHTML){box.innerHTML="";e.target.textContent="Info"}else{box.innerHTML=infoHTML(I);e.target.textContent="Masquer"}};
   out.querySelector("[data-mychoose]").onclick=()=>chooseIdea(I);
+  out.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
 }
 let MY=null;
 
 /* ---------- Choisir → plan de production ---------- */
-function chooseIdea(I){store.set("labo-chosen",{...ideaKey(I),at:Date.now()});location.hash="plan"}
-function currentChosen(){const k=store.get("labo-chosen");if(!k||!G.length)return null;try{return buildIdea(k)}catch{return null}}
+function chooseIdea(I){store.set("labo-chosen",{...ideaKey(I),score:I.text?I.score:undefined,at:Date.now()});location.hash="plan"}
+function currentChosen(){const k=store.get("labo-chosen");if(!k||!G.length)return null;try{const I=buildIdea(k);if(k.score!=null)I.score=k.score;return I}catch{return null}}
 
 function brief(I){
   const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k];
@@ -490,7 +541,5 @@ document.getElementById("ideaOut").addEventListener("click",e=>{
   if(inf){const i=+inf.dataset.info,box=document.getElementById("info-"+i);if(box.innerHTML){box.innerHTML="";inf.textContent="Info"}else{box.innerHTML=infoHTML(CURRENT[i]);inf.textContent="Masquer"}}
   if(ch)chooseIdea(CURRENT[+ch.dataset.choose]);
 });
-document.getElementById("myGo").onclick=rateMyIdea;
-document.getElementById("myText").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.ctrlKey||e.metaKey))rateMyIdea()});
 window.addEventListener("hashchange",()=>{if(location.hash==="#plan")renderPlan()});
-window.LABO_AFTER_LOAD=()=>{IDF=null;if(location.hash==="#plan")renderPlan()};
+window.LABO_AFTER_LOAD=()=>{IDF=null;setupForm();if(location.hash==="#plan")renderPlan()};

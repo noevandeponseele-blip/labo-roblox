@@ -96,7 +96,18 @@ tr:last-child td{border-bottom:none}
 .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .controls label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
 select,input[type=text],textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-width:100%}
-textarea{width:100%;min-height:140px;font:13px var(--mono)}
+textarea{width:100%;min-height:60px;font:14px/1.45 var(--body);resize:vertical}
+.fld{display:grid;gap:5px;font-size:13px;color:var(--muted);font-weight:600;min-width:0}
+.fld input,.fld select{width:100%}
+fieldset.fld{border:0;padding:0;margin:0}
+fieldset.fld legend{padding:0;margin-bottom:6px}
+.tick{white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font:500 13px var(--body);color:var(--ink);border:1px solid var(--line);border-radius:99px;padding:5px 11px;cursor:pointer;background:var(--surface)}
+.tick:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.tick input{accent-color:var(--accent);margin:0}
+.crit{display:grid;grid-template-columns:minmax(150px,220px) 1fr 54px;gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+.crit:last-child{border-bottom:0}
+.crit .src{font-size:13px}
+@media (max-width:640px){.crit{grid-template-columns:1fr 54px}.crit .why{grid-column:1/-1}}
 button{font:600 14px var(--body);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;border-radius:8px;cursor:pointer}
 button:hover{border-color:var(--accent)}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -278,12 +289,31 @@ footer ul{margin:6px 0 0;padding-left:18px}
 
 <section class="view" id="v-mon-idee">
   <div class="grid" style="gap:8px"><h2>Noter mon idée</h2>
-  <p class="lede">Décris ton idée de jeu comme tu veux, en français ou en anglais. Le site la compare aux 1000 jeux du top, lui donne une note et te dit comment l'améliorer.</p></div>
-  <div class="card">
-    <label for="myText" class="src" style="font-weight:600">Ton idée</label>
-    <textarea id="myText" placeholder="Ex. : Un jeu où tu fais grandir un dragon en lui lançant de la nourriture, et les autres joueurs peuvent voler tes œufs de dragon la nuit. Il y a des échanges et un événement de Noël."></textarea>
-    <div class="controls"><button class="primary" id="myGo">Noter mon idée</button><span class="src">Plus tu donnes de détails (ce que fait le joueur, le thème, ce qui est différent), plus l'analyse est précise.</span></div>
-  </div>
+  <p class="lede">Remplis la fiche de ton jeu. Plus tu détailles, plus la note est juste. Le site compare ton idée aux 1000 jeux du top et la note sur 11 critères, avec un conseil pour chacun. Ta fiche reste enregistrée dans ce navigateur.</p></div>
+  <form class="card" id="myForm" autocomplete="off">
+    <div class="grid g2">
+      <label class="fld" for="fName">Nom du jeu <input type="text" id="fName" placeholder="ex. Feed the Dragon"></label>
+      <label class="fld" for="fUniverse">Univers / thème en quelques mots <input type="text" id="fUniverse" placeholder="ex. dragons, île volcanique"></label>
+    </div>
+    <div class="grid g3">
+      <label class="fld" for="fGenre">Genre <select id="fGenre"><option value="">Je ne sais pas (auto)</option></select></label>
+      <label class="fld" for="fLoop">Recette principale <select id="fLoop"><option value="">Je ne sais pas (auto)</option></select></label>
+      <label class="fld" for="fTheme">Thème le plus proche <select id="fTheme"><option value="">Je ne sais pas (auto)</option></select></label>
+    </div>
+    <label class="fld" for="fCore">Ce que fait le joueur, minute par minute <textarea id="fCore" rows="3" placeholder="ex. Il lance de la nourriture à son dragon, le dragon grandit et pond des œufs qui rapportent de l'or. Avec l'or il achète de meilleure nourriture."></textarea></label>
+    <div class="grid g2">
+      <label class="fld" for="fGoal">L'objectif d'une partie <textarea id="fGoal" rows="2" placeholder="ex. Faire atteindre le niveau suivant à son dragon avant la nuit."></textarea></label>
+      <label class="fld" for="fProg">Pourquoi revenir demain (progression) <textarea id="fProg" rows="2" placeholder="ex. 10 stades d'évolution, dragons rares à collectionner, récompense quotidienne."></textarea></label>
+    </div>
+    <label class="fld" for="fUnique">Ce qui rend ton jeu différent des autres <textarea id="fUnique" rows="2" placeholder="ex. La nuit, les autres joueurs peuvent voler tes œufs : il faut défendre son nid."></textarea></label>
+    <fieldset class="fld"><legend>Avec les autres joueurs</legend><div class="kv" id="fSocial"></div></fieldset>
+    <fieldset class="fld"><legend>Comment le jeu rapporte</legend><div class="kv" id="fMoney"></div></fieldset>
+    <div class="grid g2">
+      <fieldset class="fld"><legend>Plateformes</legend><div class="kv" id="fPlat"></div></fieldset>
+      <label class="fld" for="fTeam">Équipe et temps <select id="fTeam"><option value="solo">Seul, quelques semaines</option><option value="small">Petite équipe ou agents IA, 1 à 2 mois</option><option value="big">Grosse équipe, plusieurs mois</option></select></label>
+    </div>
+    <div class="controls"><button type="submit" class="primary">Noter mon idée</button><button type="button" id="fExample">Remplir un exemple</button><button type="button" id="fClear">Vider la fiche</button></div>
+  </form>
   <div id="myOut" class="grid"></div>
 </section>
 
