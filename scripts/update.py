@@ -47,5 +47,6 @@ for i,g in det.items():
       "r":round(u/(u+dn)*100,1) if u+dn else None,"cr":(g.get("created") or "")[:10],"u":(g.get("updated") or "")[:10],"s":"".join(sorted(seen[i]["s"]))})
 out.sort(key=lambda x:-x["p"])
 os.makedirs("data",exist_ok=True)
-json.dump({"fetched":datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="minutes"),"pool":len(out),"games":out[:1000]},open("data/data.json","w"),ensure_ascii=False,separators=(",",":"))
+more=[[g["n"],g["pl"],g["p"]] for g in out[1000:]]
+json.dump({"fetched":datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="minutes"),"pool":len(out),"games":out[:1000],"more":more},open("data/data.json","w"),ensure_ascii=False,separators=(",",":"))
 print("OK",len(out[:1000]),"jeux sur",len(out),"| 1er:",out[0]["n"],out[0]["p"],"| 1000e:",out[min(999,len(out)-1)]["p"])

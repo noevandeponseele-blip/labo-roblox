@@ -191,6 +191,44 @@ function buildIdea({loopK,genre,thK,twist,title,noun,text}){
 }
 const ideaKey=I=>({loopK:I.loop.k,genre:I.genre,thK:I.th.k,twist:I.twist,title:I.title,noun:I.noun,text:I.text||""});
 
+/* ---------- Originalité : l'idée existe-t-elle déjà ? ---------- */
+const TSTOP=new Set("a an the of in on to and or my your for with vs x de la le les des du un une et".split(" "));
+const ttoks=n=>new Set(clean(n).toLowerCase().replace(/[^a-z0-9+À-ɏ\s]/g," ").split(/\s+/).filter(w=>w&&!TSTOP.has(w)).map(w=>w.replace(/s$/,"")));
+let TIDX=null;
+function titleIndex(){if(TIDX&&TIDX.f===D.fetched)return TIDX.list;
+  const list=G.map(g=>({n:g.tn,url:gameUrl(g),p:g.p,rank:g.rank,t:ttoks(g.n),loops:g.loops,themes:g.themes}));
+  (D.more||[]).forEach(([n,pl,p])=>list.push({n:clean(n),url:`https://www.roblox.com/games/${pl}`,p,rank:null,t:ttoks(n)}));
+  TIDX={f:D.fetched,list};return list}
+function originality(I){
+  const list=titleIndex(),it=ttoks(I.title),nounT=ttoks(I.noun||""),norm2=x=>[...x].sort().join(" ");
+  const key=norm2(it);const out=[];let copy=false;
+  for(const g of list){
+    let inter=0;it.forEach(w=>{if(g.t.has(w))inter++});
+    const uni=it.size+g.t.size-inter,jac=uni?inter/uni:0;
+    const exact=key&&norm2(g.t)===key;
+    const nounHit=[...nounT].some(w=>g.t.has(w));
+    const loopHit=LOOPS[I.loop.k].re.test(g.n);
+    const concept=nounHit&&loopHit;
+    const sameCombo=g.loops&&g.loops.includes(I.loop.k)&&g.themes&&g.themes.includes(I.th.k)&&nounHit;
+    let why="";
+    if(exact){why="même titre";copy=true}
+    else if(jac>=.67){why="titre presque identique";if(g.p>=1000)copy=true}
+    else if(concept){why="même action et même sujet dans le titre";if(g.p>=3000)copy=true}
+    else if(sameCombo){why="même recette et même thème"}
+    else if(jac>=.4&&inter>=2){why="titre très proche"}
+    if(why)out.push({...g,why,score:(exact?10:0)+jac*4+(concept?3:0)+(sameCombo?1:0)});
+  }
+  out.sort((a,b)=>b.score-a.score||b.p-a.p);
+  const level=copy?"copy":out.length?"close":"original";
+  return {level,matches:out.slice(0,5),checked:list.length};
+}
+const searchUrl=t=>`https://www.roblox.com/discover/?Keyword=${encodeURIComponent(t)}`;
+function origHTML(I){const o=I.orig||(I.orig=originality(I));
+  const m=o.matches.map(g=>`<a class="chip" href="${g.url}">${esc(g.n)}${g.rank?` · #${g.rank}`:""} · ${fmtK(g.p)}</a> <span class="src">(${esc(g.why)})</span>`).join("<br>");
+  if(o.level=="original")return `<div class="orig ok"><b>✓ Originale</b><span class="src">Aucun des ${fr(o.checked)} jeux relevés n'a ce titre ou ce concept. <a href="${searchUrl(I.title)}">Vérifier aussi dans la recherche Roblox</a> pour les petits jeux qui ne sont dans aucun classement.</span></div>`;
+  if(o.level=="close")return `<div class="orig warn"><b>Ressemble à des jeux existants</b><span class="src">Je pense que ces jeux sont proches de cette idée. Regarde-les pour être sûr que la tienne est différente :</span><div style="line-height:2">${m}</div><span class="src"><a href="${searchUrl(I.title)}">Chercher « ${esc(I.title)} » sur Roblox</a></span></div>`;
+  return `<div class="orig bad"><b>Copie probable</b><span class="src">Ce titre ou ce concept existe déjà :</span><div style="line-height:2">${m}</div><span class="src">Change le nom et ajoute un vrai twist.</span></div>`;
+}
 /* ---------- Fiche Info ---------- */
 function infoHTML(I){
   const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k];
@@ -319,6 +357,8 @@ function rateForm(){
     if(!/[àâçéèêëîïôûùœ]/i.test(name)&&!/\b(le|la|les|des|du|un|une|et)\b/i.test(name))nScore+=1;else nameTips.push("La plupart des joueurs cherchent en anglais : un titre en anglais touchera plus de monde.");}
   else nameTips.push("Donne un nom à ton jeu.");
   add("Conception","Nom du jeu",7,nScore,name?`« ${name} »`:"Pas de nom.",nameTips.join(" "));
+  I.orig=originality(I);
+  if(I.orig.level=="copy"&&name){const c=C.find(c=>c.label=="Nom du jeu");c.score=Math.min(c.score,1);c.tip=(c.tip?c.tip+" ":"")+`Le nom ou le concept existe déjà (${I.orig.matches[0].n}) : change-le.`}
   const total=C.reduce((s,c)=>s+c.score,0);I.score=total;
   const verdict=total>=75?["Excellente base","good"]:total>=60?["Idée solide","good"]:total>=45?["À retravailler","warn"]:["Encore fragile","bad"];
   const prios=[...C].filter(c=>c.tip).sort((a,b)=>a.score/a.max-b.score/b.max).slice(0,3);
@@ -327,14 +367,15 @@ function rateForm(){
   MY=I;
   const crit=c=>`<div class="crit"><div><b>${esc(c.label)}</b></div><div class="why"><div class="meter" style="margin:6px 0"><i style="width:${c.score/c.max*100}%;background:${c.score/c.max>=.7?"var(--good)":c.score/c.max>=.4?"var(--warn)":"var(--bad)"}"></i></div><div class="src">${esc(c.why)}</div>${c.tip?`<div class="src" style="color:var(--ink);margin-top:3px">→ ${esc(c.tip)}</div>`:""}</div><div class="n" style="font:600 15px var(--mono);text-align:right">${c.score}/${c.max}</div></div>`;
   out.innerHTML=`<article class="idea">
-   <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:start">
+   <div class="top">
     <div class="grid" style="gap:6px"><span class="stamp">Ta fiche · ${esc(gname(I.genre))} · ${esc(LOOPS[loopK].name)} · ${esc(themeAuto&&uni?uni:THEMES[thK].label)}</span><div class="title">${esc(name||"Sans nom")}</div><div><span class="chip ${verdict[1]}">${verdict[0]}</span></div></div>
-    <div style="text-align:right"><div class="bignum">${total}</div><div class="src">sur 100</div></div>
+    ${ring(total)}
    </div>
    ${prios.length?`<div class="card" style="gap:6px;border-left:3px solid var(--warn)"><b>Tes 3 priorités pour gagner des points</b><ol class="list">${prios.map(c=>`<li><b>${esc(c.label)}</b> (${c.score}/${c.max}) : ${esc(c.tip)}</li>`).join("")}</ol></div>`:""}
    ${big&&team=="solo"?`<div class="note">Attention : « ${esc(LOOPS[loopK].name)} » est un gros projet (${esc(projectSize(loopK))}). Seul, commence par une version très réduite, ou utilise le plan multi-agents.</div>`:""}
    <div><b>Marché</b> <span class="src">· ${C.filter(c=>c.group=="Marché").reduce((s,c)=>s+c.score,0)}/40, calculé sur le top 1000 du moment</span>${C.filter(c=>c.group=="Marché").map(crit).join("")}</div>
    <div><b>Conception</b> <span class="src">· ${C.filter(c=>c.group=="Conception").reduce((s,c)=>s+c.score,0)}/60, calculé sur ta fiche</span>${C.filter(c=>c.group=="Conception").map(crit).join("")}</div>
+   ${origHTML(I)}
    <div><b>Jeux du top 1000 les plus proches</b><div class="kv" style="margin-top:6px">${sims.slice(0,8).map(g=>`<a class="chip" href="${gameUrl(g)}">#${g.rank} ${esc(g.tn)} · ${fmtK(g.p)}</a>`).join("")||"<span class='src'>Aucun : c'est une niche.</span>"}</div></div>
    ${!name||nameTips.length?`<div><b>Idées de nom</b><div class="kv" style="margin-top:6px">${titles.map(x=>`<button type="button" class="chip" data-usename="${esc(x)}" style="border:0;cursor:pointer">${esc(x)}</button>`).join("")}</div><div class="src" style="margin-top:4px">Appuie sur un nom pour l'utiliser.</div></div>`:""}
    <div class="controls"><button data-myinfo>Info</button><button class="primary" data-mychoose>Choisir cette idée</button></div>
@@ -549,9 +590,9 @@ function renderPlan(){
   const el=$("#planOut");const I=currentChosen();
   if(!I){el.innerHTML=`<div class="note">Aucune idée choisie pour l'instant. Va dans <a href="#idees">Idées de jeux</a> ou <a href="#mon-idee">Mon idée</a> et appuie sur « Choisir ».</div>`;return}
   const AG=agents(I);PLAN=AG;
-  el.innerHTML=`<div class="idea"><span class="stamp">Idée choisie · ${esc(gname(I.genre))} · ${esc(LOOPS[I.loop.k].name)} · ${esc(I.T.label)}</span>
+  el.innerHTML=`<div class="idea"><div class="top"><div class="grid" style="gap:6px;flex:1;min-width:220px"><span class="stamp">Idée choisie · ${esc(gname(I.genre))} · ${esc(LOOPS[I.loop.k].name)} · ${esc(I.T.label)}</span>
     <div class="title">${esc(I.title)}</div><p class="pitch">${esc(pitchOf(I))}</p>
-    <div class="src">Potentiel ${I.score}/100 · ${projectSize(I.loop.k)}</div></div>
+    <div class="src">${projectSize(I.loop.k)}</div></div>${ring(I.score,"potentiel")}</div>${origHTML(I)}</div>
    ${prepHTML(I)}
    <div class="card"><h3>Comment utiliser ce plan</h3>
     <ol class="list"><li>Ouvre une conversation séparée pour chaque agent (une par rôle), par exemple avec Claude.</li>
