@@ -423,126 +423,164 @@ Règles de production pour toute l'équipe :
 - Respecter les règles de la communauté Roblox et afficher les probabilités de tout objet aléatoire payant.
 - Le téléphone est la plateforme n°1 : gros boutons, interface lisible sur petit écran, bonnes performances.`;
 }
+/* ---------- Équipe d'agents qui FONT le jeu ---------- */
+const LOOP_OBJECTS={
+ steal:["base de joueur (plateforme + murs bas + porte)","socle d'exposition d'objet","tapis roulant d'apparition","porte-laser de verrouillage","boutique d'améliorations (stand)"],
+ stat:["porte de palier (arche avec chiffre)","tapis de course","podium de rebirth","panneaux de zone"],
+ collect:["œufs ou graines (une version par rareté)","incubateur / pot","stand de boutique","table d'échange","créatures ou objets à collectionner (au moins 6)"],
+ throwfeed:["créature à chaque stade d'évolution (au moins 4 stades)","aliments (au moins 5)","enclos ou nid","distributeur de nourriture"],
+ rounds:["lobby (salle d'attente)","armes ou outils des rôles","accessoires de cachette","3 cartes de manche (structures principales)"],
+ survive:["abri / feu de camp","monstre (modèle + rig)","ressources (bois, ferraille…)","bâtiments de la carte","objets de survie (lampe, outils)"],
+ rp:["maisons (au moins 3 modèles)","véhicules (au moins 3)","mobilier (lit, cuisine, canapé…)","bâtiments du centre-ville"],
+ fashion:["podium","loge avec miroirs","vêtements et accessoires (en accessoires Roblox)","décor de défilé"],
+ build:["pièces de construction (au moins 10)","rampe de lancement","atelier"],
+ tycoon:["terrain de base","machines de production (au moins 5)","convoyeur","boutons d'achat (socle)","décor du business"],
+ td:["unités (au moins 6)","ennemis (au moins 5)","boss","éléments de chemin et décor des cartes","portail d'invocation"],
+ arena:["arène et obstacles","effets d'armes ou de pouvoirs (support visuel)","accessoires des personnages"],
+ shooter:["armes (au moins 4)","éléments de couverture","cartes (bâtiments, murs)"],
+ sport:["terrain","buts / paniers","ballon","tribunes"],
+ obby:["plateformes et obstacles (au moins 15 types)","checkpoints","décor de chaque étape"],
+ fish:["cannes à pêche (au moins 4)","poissons (au moins 12)","quai et bateaux","stand du marchand","aquarium"]
+};
+const TEAM_SIZES={6:"Petite équipe (7 agents)",12:"Équipe complète (12 agents)",18:"Grande équipe (19 agents)"};
+function teamSize(){return +(store.get("labo-team")||12)}
+function split(arr,n){const out=Array.from({length:n},()=>[]);arr.forEach((x,i)=>out[i%n].push(x));return out}
+function roster(I,size){
+  const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k],st=structOf(I.loop.k),multi=st.places.length>1;
+  const models=[...(LOOP_OBJECTS[I.loop.k]||[]),...ART.props];
+  const sys=LD.systems;
+  const R=[];
+  const add=(id,name,phase,owns,deps,mission)=>R.push({id,name,phase,owns,deps,mission});
+  add("chef","Chef de projet","Phase 0 · démarre en premier",["la structure de l'Explorer (création des dossiers vides)","les places de l'expérience"],[],
+   `1. Ouvre la place dans Roblox Studio et crée TOUT DE SUITE la structure de l'Explorer décrite dans « Organisation du jeu » (dossiers vides, au bon endroit, avec les bons noms)${multi?`, dans chacune des places : ${st.places.map(([n])=>n).join(", ")}`:""}.
+2. Envoie à chaque agent un message de départ court : ce qu'il construit en premier pour la version 1 (MVP) et de qui il dépend.
+3. Version 1 jouable = la boucle de jeu complète, les 5 premières minutes, une seule zone, l'interface principale, la sauvegarde. Le reste vient après.
+4. Toutes les 30 à 60 minutes : lance une partie de test dans Studio (Play), regarde ce qui marche, et envoie un message à l'agent concerné quand quelque chose bloque ou ne respecte pas la DA.
+5. Tranche les désaccords en une phrase, sans écrire de document.
+Tu ne codes pas et tu ne modélises pas toi-même, sauf la structure de départ.`);
+  add("da","Directeur artistique (DA)","Phase 1 · démarre tout de suite",["Lighting et Atmosphere","ReplicatedStorage/Shared/Theme (ModuleScript)","StarterGui/_UIKit (composants modèles)","ReplicatedStorage/Assets/Materials"],["chef"],
+   `Tu fixes le look du jeu DIRECTEMENT dans Studio, pas dans un document :
+1. Règle Lighting (Technology, ClockTime, Brightness, Ambient, OutdoorAmbient, ColorShift) et ajoute Atmosphere, Sky, Bloom, ColorCorrection pour l'ambiance « ${ART.mood} ».
+2. Crée le ModuleScript ReplicatedStorage/Shared/Theme qui contient la palette (Color3) : ${ART.palette} ; les couleurs de rareté ou d'équipe ; les polices Roblox choisies (Enum.Font / Font.new) ; les tailles de texte et le rayon des coins. Tous les autres agents utilisent ce module, jamais de couleur en dur.
+3. Construis dans StarterGui/_UIKit (Enabled = false) les composants d'interface modèles : bouton principal, bouton secondaire, panneau, barre de progression, fenêtre, notification. Style : ${ART.style}. Avec UICorner, UIStroke, UIGradient si utile, tailles en Scale, boutons d'au moins 60 px sur téléphone.
+4. Crée les MaterialVariants et couleurs de matériaux du décor dans ReplicatedStorage/Assets/Materials.
+5. Ensuite, passe en revue le travail des autres dans Studio (modèles, carte, interface) et envoie des corrections précises par message à l'agent concerné.
+6. À la fin : prépare dans Workspace/_Thumbnails une petite scène avec caméra pour l'icône et les miniatures du jeu.`);
+  add("gd","Game designer","Phase 1 · démarre tout de suite",["ReplicatedStorage/Shared/GameConfig (ModuleScript)"],["chef"],
+   `Tu écris le jeu en chiffres DIRECTEMENT dans le code, pas dans un document :
+1. Crée le ModuleScript ReplicatedStorage/Shared/GameConfig avec TOUTES les valeurs du jeu, commentées en français : vitesses, temps, prix, gains, probabilités, paliers (au moins 15), raretés, récompenses quotidiennes, limites anti-abus.
+2. Systèmes à chiffrer : ${sys.join(" ; ")}.
+3. Les 5 premières minutes doivent se passer comme ça : ${LD.first5} Règle les chiffres pour que ça arrive vraiment.
+4. Préviens par message le programmeur serveur et l'agent économie dès que GameConfig existe, puis à chaque changement important.
+5. Joue au jeu dans Studio dès qu'il tourne, et ajuste les valeurs de GameConfig pour l'équilibrage.`);
+  // carte
+  if(size>=18){
+    const zones=split(LD.zones,2);
+    zones.forEach((z,i)=>add("level"+(i+1),`Level designer ${i+1}`,"Phase 2 · après le DA",[`Workspace/Map/${i?"Zone_B":"Zone_A"}`],["da","chef"],`Tu construis la carte DIRECTEMENT dans Studio. Tes zones : ${z.join(" ; ")}.\n1. Blockout immédiat avec des Parts (formes simples, bonnes tailles en studs ; un joueur marche à ~16 studs/s).\n2. Teste la circulation en mode Play.\n3. Remplace le blockout par les modèles Blender des modélisateurs dès qu'ils arrivent dans ReplicatedStorage/Assets/Models (ne les modifie pas, demande-leur si besoin).\n4. Place SpawnLocation, zones sûres, emplacements des PNJ et des éléments interactifs (avec des Attributes ou des tags CollectionService que les programmeurs utiliseront ; mets-vous d'accord par message).\n5. Performance téléphone : peu de pièces, Anchored, CollisionFidelity simple, StreamingEnabled activé.`));
+  } else add("level","Level designer (carte)","Phase 2 · après le DA",["Workspace/Map"],["da","chef"],
+   `Tu construis la carte DIRECTEMENT dans Studio :
+1. Blockout immédiat avec des Parts : ${LD.zones.join(" ; ")}. Bonnes tailles en studs (un joueur marche à ~16 studs/s).
+2. Teste la circulation en mode Play : le nouveau joueur doit comprendre où aller.
+3. Remplace le blockout par les modèles Blender des modélisateurs dès qu'ils arrivent dans ReplicatedStorage/Assets/Models (ne les modifie pas toi-même, demande au modélisateur).
+4. Place SpawnLocation, zones sûres, PNJ et éléments interactifs, avec des Attributes ou des tags CollectionService convenus par message avec le programmeur serveur.
+5. Performance téléphone : peu de pièces, Anchored, CollisionFidelity simple, StreamingEnabled activé.${multi?`\n6. Construis la carte de chaque place : ${st.places.map(([n,r])=>`${n} (${r})`).join(" ; ")}.`:""}`);
+  // modélisateurs
+  const nMod=size>=18?3:size>=12?2:1;
+  split(models,nMod).forEach((list,i)=>add("model"+(i+1),nMod>1?`Modélisateur 3D ${i+1} (Blender)`:"Modélisateur 3D (Blender)","Phase 2 · après le DA",[`ReplicatedStorage/Assets/Models/${nMod>1?"Set"+(i+1):"All"}`],["da"],
+   `Tu FABRIQUES les modèles dans Blender et tu les mets dans le jeu. Tes modèles : ${list.join(" ; ")}.
+Pour chaque modèle :
+1. Modélise-le dans Blender (avec ton outil Blender : commandes, script Python bpy ou blender en ligne de commande). Style : ${ART.style}. Couleurs : celles du module Theme du DA. Peu de polygones (vise quelques centaines à quelques milliers de triangles).
+2. Échelle : un avatar Roblox fait ~5 studs ; applique les transformations, pivot au bon endroit, noms en anglais sans espaces.
+3. Exporte en FBX et importe-le dans Studio (3D Importer ou ton outil Studio), puis range-le dans ton dossier.
+4. Dans Studio : Anchored pour le décor, CollisionFidelity Box ou Hull, RenderFidelity adaptée, et un modèle propre (PrimaryPart réglé).
+5. Préviens le level designer (et le programmeur si l'objet a un rôle dans le jeu) par message quand un modèle est prêt.
+Commence par les modèles de la version 1. Interdit : modèles générés par IA, modèles de la Toolbox, modèle « fait avec des Parts » à la place d'un vrai modèle Blender.`));
+  if(size>=18){
+    add("anim","Animateur","Phase 3 · après les modélisateurs",["ReplicatedStorage/Assets/Animations"],["model1"],`Tu FAIS les animations : rig des personnages ou créatures (dans Blender, armature exportée avec le modèle, ou avec l'Animation Editor de Studio sur un rig Roblox), puis animations d'attente, de marche, d'action et de victoire liées à « ${L.name} ». Publie-les, mets les Animation objects avec leurs IDs dans ton dossier et préviens le programmeur interface/client.`);
+    add("vfx","Effets visuels (VFX)","Phase 3",["ReplicatedStorage/Assets/VFX"],["da"],`Tu FAIS les effets dans Studio : ParticleEmitter, Beam, Trail, Highlight, avec les couleurs du module Theme. Au minimum : effet de récompense, effet de rareté, effet d'amélioration, effets propres à « ${L.name} ». Chaque effet est un modèle prêt à cloner dans ton dossier ; préviens les programmeurs par message. Pense aux performances téléphone (peu de particules).`);
+  }
+  add("sound","Sound designer","Phase 2",["SoundService (SoundGroups)","ReplicatedStorage/Assets/Sounds"],["da"],
+   `Tu METS les sons dans le jeu, uniquement depuis la bibliothèque audio de Roblox (Creator Store, Toolbox → Audio). Tu ne génères aucun son, tu n'importes rien de l'extérieur.
+1. Cherche et choisis les sons : ${LD.sfx.join(", ")}, les clics et validations de l'interface, et la musique (mots-clés : « ${ART.music} » ; ambiance : « ${ART.amb} »).
+2. Crée chaque Sound dans ReplicatedStorage/Assets/Sounds avec son SoundId (rbxassetid://…), un nom clair, Volume et Looped réglés. Vérifie qu'il joue dans Studio.
+3. Crée les SoundGroups dans SoundService (Music, SFX, UI, Ambience) et rattache chaque son.
+4. Place les sons 3D d'ambiance dans la carte (avec RollOffMaxDistance) en accord avec le level designer.
+5. Envoie la liste des noms de sons aux programmeurs par message.`);
+  // programmeurs
+  if(size<=6){
+    add("dev","Programmeur (serveur + interface)","Phase 2 · dès que GameConfig existe",["ServerScriptService/Systems","StarterGui (écrans)","StarterPlayer/StarterPlayerScripts"],["gd","da"],devServer(I,sys)+"\n\n"+devClient(I));
+  } else {
+    const parts=size>=18?split(sys,2):[sys];
+    parts.forEach((p,i)=>add("server"+(i+1),parts.length>1?`Programmeur serveur ${i+1}`:"Programmeur serveur","Phase 2 · dès que GameConfig existe",[`ServerScriptService/Systems${parts.length>1?` (systèmes : ${p.join(", ")})`:""}`,i==0?"ReplicatedStorage/Remotes":""].filter(Boolean),["gd"],devServer(I,p,i==0)));
+    add("ui","Programmeur interface (UI)","Phase 2 · dès que le UIKit du DA existe",["StarterGui (écrans du jeu)","StarterPlayer/StarterPlayerScripts/UI"],["da","server1"],devClient(I));
+  }
+  if(size>=12) add("eco","Économie et monétisation","Phase 3",["ServerScriptService/Systems/Monetization","la section boutique de GameConfig (avec le game designer)"],["gd","server1"],
+   `Tu CODES la monétisation dans le jeu :
+1. Produits : ${LD.money.join(" ; ")}. Demande au créateur (par message au chef de projet) les IDs des game passes et produits créés dans le Creator Hub ; en attendant, mets des IDs de test dans GameConfig.
+2. Écris le système d'achat : UserOwnsGamePassAsync, PromptGamePassPurchase/PromptProductPurchase, MarketplaceService.ProcessReceipt (sauvegarde avant de confirmer, jamais de double crédit).
+3. Récompenses gratuites : quotidienne, temps de jeu, groupe Roblox.
+4. Objets aléatoires payants : affiche les probabilités dans l'interface (règle Roblox).
+5. Aucun avantage payant écrasant contre les autres joueurs. Vérifie l'économie en jouant.`);
+  if(size>=12) add("qa","Testeur (QA)","Phase 4 · dès qu'une version tourne",["ServerScriptService/Tests (désactivé avant la sortie)"],["chef"],
+   `Tu TESTES le jeu dans Studio, tu ne réécris pas le code des autres :
+1. Lance des tests en mode Play et en serveur local à 2–4 joueurs (onglet Test). Vérifie chaque système : ${sys.join(" ; ")}.
+2. Sauvegarde : quitter/revenir, quitter pendant un achat.
+3. Téléphone : émulateur d'appareils de Studio (plusieurs tailles).
+4. Triche simple : fausses valeurs envoyées aux RemoteEvents, actions trop rapides.
+5. Performance : MicroProfiler et statistiques.
+6. Chaque bug = un message court à l'agent qui possède le dossier concerné : étapes, attendu, obtenu. Re-teste quand il te dit que c'est corrigé.`);
+  if(size>=12) add("launch","Lancement","Phase 5 · en fin de version 1",["Workspace/_Thumbnails (avec le DA)","StarterGui/UpdateLog"],["da","ui"],
+   `1. Construis dans le jeu le panneau « Nouveautés » (StarterGui/UpdateLog) et le système de codes promo (avec le programmeur serveur).
+2. Avec la scène du DA dans Workspace/_Thumbnails, cadre l'icône (512×512) et 3 miniatures (1920×1080) et fais les captures.
+3. Écris le titre (mot-clé principal dans les 3 premiers mots ; piste : « ${I.title} ») et la description de la page du jeu, prêts à coller dans le Creator Hub, et envoie-les au chef de projet.
+4. ${seasonText()} Prépare l'événement de saison dans le jeu (décor et récompense) avec le DA et le game designer.`);
+  if(size>=18){
+    add("tuto","Onboarding (tutoriel)","Phase 3",["StarterGui/Tutorial","StarterPlayer/StarterPlayerScripts/Tutorial"],["ui","gd"],`Tu FAIS le tutoriel dans le jeu : flèches 3D (Beam) et bulles qui guident le nouveau joueur pendant les 5 premières minutes : ${LD.first5} Il se déclenche seulement à la première visite (donnée sauvegardée), se passe d'un bouton, et utilise le UIKit et le Theme du DA.`);
+    add("social","Fonctions sociales","Phase 3",["ServerScriptService/Systems/Social","StarterGui/Social"],["server1","ui"],`Tu CODES les fonctions qui font jouer ensemble : classement du serveur (leaderstats et classement global avec OrderedDataStore), invitations d'amis (SocialService), bonus en jouant avec des amis, et ${I.loop.k==="collect"||I.loop.k==="steal"?"le système d'échanges sécurisé (double confirmation côté serveur)":"un bonus de groupe Roblox"}.`);
+  }
+  return R;
+}
+function devServer(I,sys,main=true){const LD=LOOP_DESIGN[I.loop.k],st=structOf(I.loop.k);
+  return `Tu ÉCRIS LE CODE directement dans Studio (Scripts et ModuleScripts), pas dans un document :
+1. Systèmes à coder : ${sys.join(" ; ")}. Un ModuleScript par système dans ServerScriptService/Systems, un Script de démarrage qui les lance.
+2. Tous les chiffres viennent de ReplicatedStorage/Shared/GameConfig (jamais de valeur en dur).
+3. ${main?`Crée ReplicatedStorage/Remotes avec les RemoteEvents/RemoteFunctions nécessaires et envoie leur liste au programmeur interface. Sauvegarde avec DataStoreService : ${LD.save.join(" ; ")} (chargement à l'arrivée, sauvegarde régulière, à la sortie et dans BindToClose, avec pcall et nouvelles tentatives).`:"Utilise les Remotes et le service de données créés par le programmeur serveur 1 (demande-lui l'interface par message)."}
+4. Le serveur vérifie tout (distances, temps de recharge, argent, objets possédés) ; le client ne décide de rien d'important.
+5. Utilise les tags CollectionService ou Attributes posés par le level designer pour trouver les objets de la carte.${st.places.length>1&&main?`\n6. Téléportation entre ${st.places.map(([n])=>n).join(" et ")} avec TeleportService (groupe de joueurs, échecs gérés, retour au lobby).`:""}
+Teste chaque système en mode Play et en serveur local à 2 joueurs avant de dire qu'il est fini.`}
+function devClient(I){const LD=LOOP_DESIGN[I.loop.k];
+  return `Tu CONSTRUIS l'interface directement dans StarterGui et tu écris les LocalScripts :
+1. Écrans : ${LD.ui.join(" ; ")}.
+2. Construis-les en clonant les composants de StarterGui/_UIKit du DA, avec les couleurs et polices du module ReplicatedStorage/Shared/Theme. Aucune couleur ni police en dur : l'interface doit avoir exactement la DA du jeu.
+3. Tailles en Scale, UIAspectRatioConstraint si besoin, boutons d'au moins 60 px, testé dans l'émulateur téléphone de Studio.
+4. Animations avec TweenService, sons d'interface pris dans ReplicatedStorage/Assets/Sounds (ceux du sound designer, aucun autre).
+5. Branche chaque écran aux Remotes du programmeur serveur ; le client affiche, le serveur décide.`}
 function agents(I){
-  const L=LOOPS[I.loop.k],LD=LOOP_DESIGN[I.loop.k],ART=THEME_ART[I.th.k],B=brief(I);
-  const head=(role)=>`Tu es ${role} dans une petite équipe qui crée un jeu Roblox. Lis d'abord le brief ci-dessous, puis fais ta mission. Réponds en français. Si une information te manque, fais un choix raisonnable, écris-le clairement dans une section « Hypothèses », et continue.\n\n${B}\n\n`;
-  return [
-   {id:"chef",name:"Chef de projet",phase:"Phase 0 — avant tout le reste",why:"Organise le travail et vérifie que tout s'emboîte.",prompt:head("le chef de projet")+`TA MISSION
-1. Découpe le jeu en tâches pour ces agents : Directeur artistique, Game designer, Level designer, Modélisateur 3D (Blender), Sound designer, Programmeur serveur, Programmeur interface, Économie et monétisation, Testeur, Lancement.
-2. Donne l'ordre de travail et les dépendances (qui attend qui).
-3. Définis une version 1 minimale (MVP) jouable en 2 à 3 semaines : liste exacte de ce qui est dedans et de ce qui est repoussé à plus tard.
-4. Propose 3 jalons avec une date relative (semaine 1, 2, 3) et ce qui doit être testable à chacun.
-5. Fixe les conventions communes : noms des dossiers dans l'Explorer de Roblox Studio (ReplicatedStorage, ServerScriptService, StarterGui…), nommage des modèles, des sons et des RemoteEvents.
+  const size=teamSize(),R=roster(I,size),ART=THEME_ART[I.th.k];
+  const team=R.map(a=>`- ${a.name} : ${a.owns.join(", ")}`).join("\n");
+  return R.map(a=>({...a,why:`Possède : ${a.owns.join(", ")}`,prompt:
+`Tu es l'agent « ${a.name} » d'une équipe de ${R.length} agents IA qui fabriquent ensemble un jeu Roblox, en même temps, dans le même projet Roblox Studio.
 
-LIVRABLE : un plan en tableau (tâche, agent, dépend de, semaine), la liste MVP, et les conventions de nommage.`},
-   {id:"da",name:"Directeur artistique (DA)",phase:"Phase 1",why:"Fixe le look du jeu pour que modèles, carte et interface aillent ensemble.",prompt:head("le directeur artistique")+`TA MISSION
-1. Écris le guide de style : formes (arrondies ou anguleuses), niveau de détail, proportions des personnages et objets par rapport à un avatar Roblox (environ 5 studs de haut).
-2. Palette finale : 6 à 8 couleurs avec code hex et usage (décor, objets rares, interface, danger…). Pars de : ${ART.palette}.
-3. Éclairage dans Roblox Studio : réglages de Lighting (Technology, ClockTime, Brightness, Ambient, Atmosphere, couleurs du ciel) pour l'ambiance ${ART.mood}.
-4. Code couleur des raretés ou des équipes si le jeu en a.
-5. Style de l'interface : formes des boutons, coins arrondis, polices Roblox disponibles (choisis parmi les polices intégrées de Roblox), tailles minimales sur téléphone.
-6. Liste complète des modèles 3D à créer avec, pour chacun : nom, description, taille en studs, niveau de détail, priorité (MVP ou plus tard). Inclure au minimum : ${ART.props.join(", ")}, et les objets propres à la recette « ${L.name} ».
-7. Brief de l'icône (512×512) et des miniatures (1920×1080) du jeu : composition, personnage ou objet au centre, texte éventuel.
+RÈGLE N°1 : TU FAIS LE TRAVAIL DANS LE JEU.
+Tu construis, codes, modélises ou règles toi-même avec tes outils (Roblox Studio, Blender, terminal). Tu ne rédiges PAS de plan, de cahier des charges ou de document « à faire » à la place du travail. Le seul texte que tu écris en dehors du jeu, c'est un compte rendu de 5 lignes maximum à la fin, envoyé au chef de projet.
 
-LIVRABLE : le guide de style complet + le tableau des modèles à transmettre au modélisateur 3D.`},
-   {id:"gd",name:"Game designer",phase:"Phase 1",why:"Transforme l'idée en règles précises et en chiffres.",prompt:head("le game designer")+`TA MISSION
-1. Écris les règles complètes, étape par étape, de la boucle : ${LD.core.join(" → ")}.
-2. Donne tous les chiffres : vitesses, temps, prix, gains, probabilités, paliers de progression (au moins 15 paliers), et la courbe de progression sur 1 heure, 1 jour et 1 semaine de jeu.
-3. Systèmes détaillés : ${LD.systems.join(" ; ")}. Pour chacun : comment il marche, ses paramètres, ses cas limites.
-4. Les 5 premières minutes, seconde par seconde : ${LD.first5}
-5. Ce qui fait revenir le joueur : récompense quotidienne, objectifs, événements${I.text?"":`, et le twist « ${I.twist} »`}.
-6. Ce qui est sauvegardé : ${LD.save.join(" ; ")}. Donne la structure exacte des données (noms de champs, types, valeurs par défaut).
-7. Les risques d'abus (triche, farm, AFK) et comment les limiter.
+${brief(I)}
 
-LIVRABLE : document de game design + un tableau d'équilibrage (paliers, prix, gains, probabilités) prêt à copier dans un ModuleScript de configuration.`},
-   {id:"level",name:"Level designer (carte)",phase:"Phase 2 — après le DA et le game designer",why:"Construit la carte dans Roblox Studio.",prompt:head("le level designer")+`TA MISSION
-1. Fais le plan de la carte vu du dessus avec les zones : ${LD.zones.join(" ; ")}. Donne les dimensions en studs et les distances entre zones (le joueur marche à environ 16 studs par seconde par défaut).
-2. Indique le parcours du nouveau joueur : où il apparaît, ce qu'il voit en premier, où il va ensuite.
-3. Placement : points d'apparition (SpawnLocation), zones de sécurité, emplacements des PNJ, boutiques et éléments interactifs.
-4. Décor : quels modèles du DA vont où, et la densité de décor par zone.
-5. Performance téléphone : nombre maximal de pièces visibles, utilisation de StreamingEnabled, pas de pièces inutilement petites ou nombreuses.
-6. Étapes pour le construire dans Roblox Studio : formes de base en Parts d'abord (blockout), test de la circulation, puis remplacement par les modèles Blender.
-7. Organisation dans l'Explorer : un dossier Map dans Workspace avec un sous-dossier par zone.
+ORGANISATION DU JEU DANS STUDIO (chaque agent ne modifie QUE ce qu'il possède)
+${team}
+Si tu as besoin d'un changement dans ce que possède un autre agent, envoie-lui un message court au lieu de le faire toi-même. Si ce dont tu dépends n'existe pas encore, crée un remplaçant temporaire simple dans TON dossier et continue.
 
-LIVRABLE : plan de la carte décrit précisément (avec un schéma en texte), liste des zones avec dimensions, et la checklist de construction dans Studio.`},
-   {id:"model",name:"Modélisateur 3D (Blender)",phase:"Phase 2 — après le DA",why:"Crée tous les modèles dans Blender, pas d'IA ni de modèles tout faits.",prompt:head("le modélisateur 3D")+`RÈGLE ABSOLUE : tous les modèles sont faits à la main dans Blender. Pas de modèle généré par IA, pas de modèle téléchargé, pas de modèle de la Toolbox.
+OUTILS IMPOSÉS
+- Modèles 3D : uniquement fabriqués dans Blender (piloté par ton outil Blender ou un script Python bpy), exportés en FBX, importés dans Studio. Jamais de modèle généré par IA ni de modèle de la Toolbox.
+- Sons et musiques : uniquement la bibliothèque audio de Roblox. Rien de généré, rien d'importé.
+- Interface : uniquement les composants StarterGui/_UIKit et le module Theme du DA.
+- Code : Luau, logique importante côté serveur.
 
-TA MISSION
-Pour chaque modèle de la liste du DA (au minimum : ${ART.props.join(", ")} et les objets de la recette « ${L.name} ») :
-1. Décris comment le modéliser dans Blender étape par étape (formes de départ, modificateurs utiles comme Bevel, Mirror, Array, Subdivision avec parcimonie).
-2. Budget : style ${ART.style}, peu de polygones. Reste léger (quelques centaines à quelques milliers de triangles par objet) et donne un objectif de triangles pour chaque modèle.
-3. Échelle : règle-la pour qu'un avatar Roblox fasse environ 5 studs, et vérifie la taille au moment de l'import dans Studio.
-4. Pivot (origine) au bon endroit, transformations appliquées (Ctrl+A), noms clairs en anglais sans espaces.
-5. Couleurs et textures : couleurs unies selon la palette du DA, ou textures simples. Indique si on utilise des couleurs de matériau ou une texture, et la taille de texture (512 ou 1024).
-6. Export : FBX depuis Blender, un fichier par modèle (ou par lot cohérent), avec les bons réglages d'export, puis import dans Roblox Studio avec le 3D Importer.
-7. Dans Studio : réglage de CollisionFidelity (Box ou Hull pour le décor, plus précis seulement si nécessaire), Anchored pour le décor, et RenderFidelity.
-8. Les objets animés (si besoin) : armature simple, et comment importer l'animation.
+TA MISSION (${a.phase}${a.deps.length?` · dépend de : ${a.deps.map(d=>(R.find(x=>x.id===d)||{name:d}).name).join(", ")}`:""})
+${a.mission}
 
-LIVRABLE : une fiche par modèle (étapes Blender, triangles visés, taille en studs, réglages d'import) + l'ordre de production (MVP d'abord).`},
-   {id:"sound",name:"Sound designer",phase:"Phase 2",why:"Choisit tous les sons dans la bibliothèque de Roblox, rien n'est généré.",prompt:head("le sound designer")+`RÈGLE ABSOLUE : tous les sons et musiques viennent de la bibliothèque audio de Roblox (Creator Store, ou la Toolbox de Roblox Studio → Audio). Ne génère aucun son, n'en crée aucun, n'importe rien de l'extérieur.
-
-TA MISSION
-1. Liste tous les sons nécessaires. Au minimum : ${LD.sfx.join(", ")}, plus les clics et validations de l'interface, et la musique.
-2. Pour chaque son, donne les mots-clés en anglais à taper dans la bibliothèque (ex. pour la musique : « ${ART.music} » ; pour l'ambiance : « ${ART.amb} »), la durée idéale, s'il boucle, et son volume de départ.
-3. Explique comment vérifier qu'un son peut être utilisé dans le jeu (son de la bibliothèque Roblox, disponible pour les expériences) et comment noter son ID (rbxassetid://…).
-4. Organisation dans Studio : SoundGroups (Musique, Effets, Interface, Ambiance) dans SoundService, volumes par groupe, et un réglage pour couper la musique.
-5. Sons 3D : quels sons sont placés dans le monde (dans une Part, avec RollOffMaxDistance) et lesquels sont joués dans l'interface.
-6. Plan musical : quelle musique dans quelle zone ou à quel moment, et comment faire les transitions.
-
-LIVRABLE : un tableau (nom du son, usage, mots-clés de recherche, boucle oui/non, volume, groupe, case vide pour l'ID trouvé) + les réglages de SoundService.`},
-   {id:"server",name:"Programmeur serveur (Luau)",phase:"Phase 3 — après le game designer",why:"Code toute la logique du jeu côté serveur.",prompt:head("le programmeur gameplay côté serveur")+`TA MISSION
-Écris le code Luau complet côté serveur, prêt à coller dans Roblox Studio.
-1. Architecture : liste des Scripts et ModuleScripts (dans ServerScriptService et ReplicatedStorage), le rôle de chacun, et un ModuleScript de configuration avec tous les chiffres du game designer.
-2. Systèmes : ${LD.systems.join(" ; ")}.
-3. Sauvegarde avec DataStoreService : ${LD.save.join(" ; ")}. Gère le chargement à l'arrivée, la sauvegarde régulière, à la sortie et à la fermeture du serveur (BindToClose), avec pcall et nouvelles tentatives en cas d'échec.
-4. Communication : liste des RemoteEvents et RemoteFunctions avec leurs paramètres. Le serveur vérifie TOUT (distance, temps de recharge, argent suffisant, objet possédé).
-5. Anti-triche de base : limites de fréquence, vérification des positions, aucune valeur importante calculée par le client.
-6. Achats : traitement des game passes (UserOwnsGamePassAsync) et des produits (ProcessReceipt, avec sauvegarde avant de confirmer l'achat).
-7. Performance : éviter les boucles lourdes, utiliser des événements, nettoyer à la sortie d'un joueur.${structOf(I.loop.k).places.length>1?`
-8. Plusieurs places : code la téléportation entre ${structOf(I.loop.k).places.map(([n])=>`« ${n} »`).join(" et ")} avec TeleportService (groupe de joueurs ensemble, gestion des échecs de téléportation, retour au lobby en fin de partie) et la transmission des données utiles. Indique quel script va dans quelle place.`:""}
-
-LIVRABLE : tout le code, fichier par fichier, avec l'emplacement exact de chaque script dans l'Explorer et des commentaires en français.`},
-   {id:"client",name:"Programmeur interface et client",phase:"Phase 3 — en parallèle du serveur",why:"Fait les écrans, les boutons et les contrôles téléphone.",prompt:head("le programmeur de l'interface et du client")+`TA MISSION
-Écris le code Luau côté client et construis l'interface.
-1. Écrans : ${LD.ui.join(" ; ")}. Pour chacun : disposition (en Scale et non en pixels, pour tous les écrans), éléments, animations (TweenService).
-2. Style selon le guide du DA : couleurs, coins arrondis (UICorner), contours (UIStroke), polices.
-3. Téléphone d'abord : boutons d'au moins 60 pixels, pas d'action qui demande un clavier, test en mode téléphone dans l'émulateur de Studio. Utilise ContextActionService pour les actions avec un bouton tactile.
-4. Retours visuels : nombres qui s'envolent, flash de rareté, sons d'interface (IDs du sound designer).
-5. LocalScripts : emplacement (StarterPlayerScripts, StarterGui), écoute des RemoteEvents du serveur, aucune décision importante côté client.
-6. Tutoriel des premières minutes : flèches et messages qui guident le joueur.
-
-LIVRABLE : la structure de chaque ScreenGui (arborescence des éléments) + tout le code client, fichier par fichier, commenté en français.`},
-   {id:"eco",name:"Économie et monétisation",phase:"Phase 3",why:"Fixe les prix et vérifie que le jeu est juste et rentable.",prompt:head("le responsable de l'économie et de la monétisation")+`TA MISSION
-1. Monnaies du jeu : comment on les gagne, comment on les dépense, et le rythme de gain par heure.
-2. Liste des game passes et produits de développeur : ${LD.money.join(" ; ")}. Pour chacun : nom, description pour la boutique, prix en Robux, et pourquoi ce prix.
-3. Vérifie que le jeu reste juste : pas d'avantage payant écrasant contre les autres joueurs, et le joueur gratuit doit pouvoir tout découvrir.
-4. Objets aléatoires payants : affiche toujours les probabilités, conformément aux règles de Roblox.
-5. Où et quand proposer les achats sans gêner (jamais pendant le tutoriel).
-6. Récompenses gratuites : quotidiennes, temps de jeu, groupe Roblox, favoris.
-7. Indicateurs à suivre : rétention J1 et J7, temps de session, conversion, revenu moyen, et lesquels regarder en premier.
-
-LIVRABLE : tableau des produits (nom, type, prix, effet, description boutique) + règles d'équilibre de l'économie.`},
-   {id:"qa",name:"Testeur (QA)",phase:"Phase 4 — quand une version est jouable",why:"Trouve les bugs avant les joueurs.",prompt:head("le testeur QA")+`TA MISSION
-1. Écris un plan de test complet : chaque système (${LD.systems.join(" ; ")}), chaque écran, chaque achat.
-2. Tests multi-joueurs : lance un serveur local avec plusieurs joueurs dans Roblox Studio (onglet Test) et liste ce qu'il faut vérifier (synchronisation, vol, échanges, déconnexions).
-3. Tests de sauvegarde : quitter et revenir, quitter pendant un achat, serveur qui se ferme.
-4. Tests téléphone : émulateur de Studio (plusieurs tailles d'écran) puis vrai téléphone. Lisibilité, boutons, performance.
-5. Tentatives de triche simples à vérifier : envoyer de fausses valeurs aux RemoteEvents, se téléporter, cliquer trop vite.
-6. Performance : utiliser le MicroProfiler et les statistiques de Studio, avec des seuils à respecter.
-7. Format de rapport de bug : étapes, résultat attendu, résultat obtenu, gravité.
-
-LIVRABLE : la checklist de test (cases à cocher) + le modèle de rapport de bug.`},
-   {id:"launch",name:"Lancement et mises à jour",phase:"Phase 5 — avant la sortie",why:"Prépare la page du jeu et le calendrier des mises à jour.",prompt:head("le responsable du lancement et des mises à jour")+`TA MISSION
-1. Titre : 5 propositions avec le mot-clé principal dans les 3 premiers mots (les joueurs sur téléphone tapent 1 à 2 mots et utilisent l'autocomplétion). Garde « ${I.title} » comme première piste.
-2. Description de la page du jeu : courte, avec les mots-clés de la recette et du thème, ce qu'on fait dans le jeu, et une section « Nouveautés ».
-3. Icône et miniatures : reprends le brief du DA et ajoute une version « mise à jour » (avec tag comme [UPD] ou un emoji de saison) pour les grosses mises à jour.
-4. Date de sortie : ${seasonText()}
-5. Calendrier de mises à jour sur 8 semaines : une petite mise à jour chaque semaine (même jour à chaque fois) et une grosse toutes les 3 à 4 semaines, avec un événement de saison.
-6. Communauté : groupe Roblox, récompense pour rejoindre le groupe, codes promo, et comment annoncer les mises à jour.
-7. Ce qu'il faut surveiller la première semaine dans les statistiques de Roblox (Creator Hub → Analytics) et quoi faire si la rétention est faible.
-
-LIVRABLE : textes prêts à copier (titre, description) + calendrier de mises à jour + checklist du jour de sortie.`}
-  ];
+QUAND TU AS FINI UNE ÉTAPE
+Teste-la en mode Play dans Studio, puis envoie au chef de projet : ce qui est maintenant dans le jeu, où (chemin dans l'Explorer), et ce qui reste. Ensuite passe à l'étape suivante sans attendre.`}));
 }
 /* ---------- Ce que le créateur doit préparer ---------- */
 const STRUCT={
@@ -569,8 +607,8 @@ function prepSteps(I){
    ["Réglages",multi?"Autorise la téléportation entre les places":"Choisis les appareils",multi?"Les places d'une même expérience peuvent se téléporter entre elles avec TeleportService, mais les téléportations ne marchent pas dans Studio : il faudra tester sur un serveur publié.":"Paramètres du jeu → Basic Info → coche Téléphone, Tablette, Ordinateur (et Console si tu le veux)."],
    ["Réglages","Active la collaboration si tu n'es pas seul","Fichier → Collaborer (Team Create) pour travailler à plusieurs sur la même place, puis invite les autres personnes."],
    ["Monétisation","Crée les game passes et produits",`Creator Hub → ton expérience → Monétisation : crée ${LD.money.slice(0,3).join(", ")}. Laisse-les « hors vente » au début. Note chaque ID et donne-les au programmeur serveur et à l'agent Économie.`],
-   ["Organisation","Prépare tes dossiers","Un dossier pour le projet avec : Blender (fichiers .blend), Exports (FBX), Sons (tableau des IDs trouvés dans la bibliothèque Roblox), Docs (le résultat de chaque agent)."],
-   ["Organisation","Un document pour coller les réponses des agents","Garde au même endroit la réponse de chaque agent : tu devras les recoller aux agents suivants (guide du DA → modélisateur, level designer, interface ; chiffres du game designer → programmeurs et économie)."],
+   ["Agents","Donne Roblox Studio et Blender à tes agents","Dans ton app d'agents, vérifie que chaque agent a accès à l'outil Roblox Studio (la place ouverte) et que les modélisateurs ont accès à Blender. Sans ça, ils ne peuvent pas construire dans le jeu."],
+   ["Agents","Lance les agents dans l'ordre des phases","Crée un agent par prompt : le chef de projet d'abord (il crée la structure de l'Explorer), puis le DA et le game designer, puis tous les autres. Ils se coordonnent entre eux par messages."],
    ["Avant la sortie","Remplis le questionnaire de maturité","Creator Hub → ton expérience → Questionnaire (Maturity & Compliance). Roblox le demande avant qu'une expérience soit publique."],
    ["Avant la sortie","Icône, miniatures et page du jeu","Importe l'icône (512×512) et les miniatures (1920×1080) préparées avec le DA, puis colle le titre et la description de l'agent Lancement."],
    ["Avant la sortie","Teste sur ton téléphone puis passe en public","Joue sur le serveur publié depuis ton téléphone avec un ami, vérifie la sauvegarde et les achats en mode test, puis passe l'expérience en public."]
@@ -594,29 +632,37 @@ function renderPlan(){
     <div class="title">${esc(I.title)}</div><p class="pitch">${esc(pitchOf(I))}</p>
     <div class="src">${projectSize(I.loop.k)}</div></div>${ring(I.score,"potentiel")}</div>${origHTML(I)}</div>
    ${prepHTML(I)}
-   <div class="card"><h3>Comment utiliser ce plan</h3>
-    <ol class="list"><li>Ouvre une conversation séparée pour chaque agent (une par rôle), par exemple avec Claude.</li>
-    <li>Copie le prompt de l'agent et colle-le. Chaque prompt contient déjà tout le brief du jeu.</li>
-    <li>Suis l'ordre des phases : le chef de projet d'abord, puis le DA et le game designer, puis les autres.</li>
-    <li>Quand un agent a fini, colle son résultat dans la conversation des agents qui en dépendent (par exemple : le guide du DA → modélisateur 3D, level designer et programmeur interface ; les chiffres du game designer → programmeur serveur et économie).</li>
-    <li>Les modèles se font dans Blender, les sons viennent uniquement de la bibliothèque Roblox : c'est écrit dans chaque prompt.</li></ol>
+   <div class="card"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:end"><h3>Ton équipe d'agents</h3>
+     <label class="fld" for="teamSize" style="min-width:220px">Nombre d'agents <select id="teamSize">${Object.entries(TEAM_SIZES).map(([n,l])=>`<option value="${n}" ${+n===teamSize()?"selected":""}>${l}</option>`).join("")}</select></label></div>
+    <p class="src" style="margin:0">Chaque agent <b>construit directement dans le jeu</b> avec Roblox Studio (et Blender pour la 3D) et ne touche qu'à sa partie de l'Explorer. Ils se coordonnent par messages. Aucun ne doit écrire de document à la place du travail.</p>
+    <div class="tablebox"><table><thead><tr><th>#</th><th>Agent</th><th>Ce qu'il possède dans Studio</th><th class="hide-sm">Quand</th></tr></thead><tbody>
+    ${AG.map((a,i)=>`<tr><td class="n">${i+1}</td><td><b>${esc(a.name)}</b></td><td class="src" style="font-size:13px">${a.owns.map(esc).join("<br>")}</td><td class="hide-sm src">${esc(a.phase)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <ol class="list"><li>Dans ton app, crée un agent par ligne du tableau et colle son prompt (bouton « Copier le prompt »). Chaque prompt contient tout le brief du jeu et la liste de l'équipe.</li>
+    <li>Lance le chef de projet en premier : il crée la structure de l'Explorer et envoie le départ à chacun. Ensuite le DA et le game designer, puis tous les autres en même temps.</li>
+    <li>Tu peux ajouter autant d'agents que tu veux avec « Ajouter un agent » en bas.</li></ol>
     <div class="controls"><button class="primary" id="copyAll">Copier tous les prompts</button><button id="copyBrief">Copier le brief seul</button><span class="src" id="planMsg" role="status"></span></div></div>
    <details class="card"><summary><b>Le brief commun</b> (inclus dans chaque prompt)</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--mono);margin:0">${esc(brief(I))}</pre></details>
    ${AG.map((a,i)=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:start">
-      <div><span class="stamp">${esc(a.phase)}</span><h3>Agent ${i+1} · ${esc(a.name)}</h3><p class="src" style="margin:2px 0 0">${esc(a.why)}</p></div>
+      <div><span class="stamp">${esc(a.phase)}</span><h3>Agent ${i+1} · ${esc(a.name)}</h3><p class="src" style="margin:2px 0 0">Possède : ${a.owns.map(esc).join(" · ")}</p></div>
       <div class="controls"><button data-copy="${i}">Copier le prompt</button></div></div>
       <details><summary class="src">Voir le prompt</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--mono);margin:8px 0 0">${esc(a.prompt)}</pre></details></div>`).join("")}
    <div class="card"><h3>Ajouter un agent</h3><p class="src" style="margin:0">Besoin d'un rôle en plus (animateur, scénariste, traducteur…) ? Écris-le ici et le site prépare son prompt avec le brief.</p>
     <div class="controls"><label for="extraRole">Rôle <input type="text" id="extraRole" placeholder="ex. animateur des personnages"></label><label for="extraTask" style="flex:1;min-width:220px">Ce qu'il doit faire <input type="text" id="extraTask" style="width:100%" placeholder="ex. les animations de marche, d'attaque et de victoire"></label><button id="extraGo">Créer le prompt</button></div>
     <div id="extraOut"></div></div>`;
   wirePrep(I);
+  $("#teamSize").onchange=e=>{store.set("labo-team",+e.target.value);renderPlan()};
   const msg=t=>{$("#planMsg").textContent=t};
   const copy=async(txt,m)=>{try{await navigator.clipboard.writeText(txt);msg(m)}catch{msg("Le navigateur a bloqué la copie : ouvre « Voir le prompt » et sélectionne le texte.")}};
   $("#copyAll").onclick=()=>copy(AG.map((a,i)=>`===== AGENT ${i+1} · ${a.name} (${a.phase}) =====\n\n${a.prompt}`).join("\n\n\n"),"Les "+AG.length+" prompts sont copiés.");
   $("#copyBrief").onclick=()=>copy(brief(I),"Brief copié.");
   el.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>{const a=AG[+b.dataset.copy];copy(a.prompt,`Prompt « ${a.name} » copié.`);b.textContent="Copié ✓";setTimeout(()=>b.textContent="Copier le prompt",1800)});
   $("#extraGo").onclick=()=>{const r=$("#extraRole").value.trim(),t=$("#extraTask").value.trim();if(!r){$("#extraOut").innerHTML=`<p class="src">Écris d'abord le rôle.</p>`;return}
-    const p=`Tu es ${r} dans une petite équipe qui crée un jeu Roblox. Lis d'abord le brief ci-dessous, puis fais ta mission. Réponds en français. Si une information te manque, fais un choix raisonnable et écris-le dans une section « Hypothèses ».\n\n${brief(I)}\n\nTA MISSION\n${t||"Fais tout ce qui relève de ton rôle pour ce jeu, étape par étape, en respectant les règles de production du brief."}\nDétaille chaque étape pour qu'on puisse la faire dans Roblox Studio (et dans Blender s'il s'agit de 3D ou d'animation).\n\nLIVRABLE : un document précis, découpé en étapes, prêt à être utilisé par le reste de l'équipe.`;
+    const slug=r.replace(/[^A-Za-zÀ-ÿ0-9]+/g," ").trim().split(" ").map(w=>w[0].toUpperCase()+w.slice(1)).join("").replace(/[^A-Za-z0-9]/g,"")||"Extra";
+    const base=agents(I)[0].prompt;const tpl=base.slice(base.indexOf("RÈGLE N°1"));
+    const p=`Tu es l'agent « ${r} » d'une équipe d'agents IA qui fabriquent ensemble un jeu Roblox, en même temps, dans le même projet Roblox Studio. Tu possèdes le dossier ${t&&/blender|mod[eè]l|anim/i.test(r+t)?"ReplicatedStorage/Assets/"+slug:"ReplicatedStorage/Features/"+slug} (et seulement lui).
+
+`+tpl.replace(/TA MISSION \([^)]*\)\n[\s\S]*?\n\nQUAND TU AS FINI/,`TA MISSION\n${t||"Fais tout ce qui relève de ton rôle, directement dans le jeu."}\nFais-le directement dans Roblox Studio${/mod[eè]l|3d|anim|blender/i.test(r+t)?" et dans Blender":""}, en respectant la DA (module Theme) et les outils imposés.\n\nQUAND TU AS FINI`);
     $("#extraOut").innerHTML=`<div class="controls" style="margin-top:8px"><button id="extraCopy">Copier ce prompt</button></div><pre style="white-space:pre-wrap;font:13px/1.5 var(--mono)">${esc(p)}</pre>`;
     $("#extraCopy").onclick=()=>copy(p,"Prompt copié.")};
 }
