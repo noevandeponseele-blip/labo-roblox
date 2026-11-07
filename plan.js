@@ -366,6 +366,7 @@ ${LD.core.map((x,i)=>`${i+1}. ${x}`).join("\n")}
 
 Les 5 premières minutes : ${LD.first5}
 
+Structure de l'expérience : ${(()=>{const st=structOf(I.loop.k);return st.places.map(([n,r],i)=>`place « ${n} » (max ${st.max[i]??st.max[0]} joueurs) : ${r}`).join(" ; ")+". "+st.why})()} Les IDs des places et des game passes sont fournis par le créateur.
 Systèmes : ${LD.systems.join(" ; ")}.
 Carte : ${LD.zones.join(" ; ")}.
 Interface : ${LD.ui.join(" ; ")}.
@@ -456,7 +457,8 @@ LIVRABLE : un tableau (nom du son, usage, mots-clés de recherche, boucle oui/no
 4. Communication : liste des RemoteEvents et RemoteFunctions avec leurs paramètres. Le serveur vérifie TOUT (distance, temps de recharge, argent suffisant, objet possédé).
 5. Anti-triche de base : limites de fréquence, vérification des positions, aucune valeur importante calculée par le client.
 6. Achats : traitement des game passes (UserOwnsGamePassAsync) et des produits (ProcessReceipt, avec sauvegarde avant de confirmer l'achat).
-7. Performance : éviter les boucles lourdes, utiliser des événements, nettoyer à la sortie d'un joueur.
+7. Performance : éviter les boucles lourdes, utiliser des événements, nettoyer à la sortie d'un joueur.${structOf(I.loop.k).places.length>1?`
+8. Plusieurs places : code la téléportation entre ${structOf(I.loop.k).places.map(([n])=>`« ${n} »`).join(" et ")} avec TeleportService (groupe de joueurs ensemble, gestion des échecs de téléportation, retour au lobby en fin de partie) et la transmission des données utiles. Indique quel script va dans quelle place.`:""}
 
 LIVRABLE : tout le code, fichier par fichier, avec l'emplacement exact de chaque script dans l'Explorer et des commentaires en français.`},
    {id:"client",name:"Programmeur interface et client",phase:"Phase 3 — en parallèle du serveur",why:"Fait les écrans, les boutons et les contrôles téléphone.",prompt:head("le programmeur de l'interface et du client")+`TA MISSION
@@ -501,6 +503,48 @@ LIVRABLE : la checklist de test (cases à cocher) + le modèle de rapport de bug
 LIVRABLE : textes prêts à copier (titre, description) + calendrier de mises à jour + checklist du jour de sortie.`}
   ];
 }
+/* ---------- Ce que le créateur doit préparer ---------- */
+const STRUCT={
+ td:{places:[["Lobby","place de départ : choix des unités, invocations, groupe de joueurs"],["Partie","la carte où se jouent les vagues ; les joueurs y sont envoyés en groupe depuis le lobby"]],max:[12,4],why:"Les parties de tower defense se jouent à 1–4 joueurs alors que le lobby en réunit beaucoup plus : deux places séparées, reliées par TeleportService."},
+ survive:{places:[["Lobby","place de départ : choix de la classe, formation des groupes, boutique"],["Partie","la carte de survie où le groupe est envoyé ensemble"]],max:[20,6],why:"Une partie de survie se joue en petit groupe du début à la fin : le lobby forme les groupes et les envoie ensemble dans la place Partie avec TeleportService."},
+ rounds:{places:[["Jeu","une seule place : le lobby et les cartes sont dans la même place, le serveur gère les manches"]],max:[12],why:"Les manches s'enchaînent dans le même serveur, comme Murder Mystery 2 : une seule place suffit."},
+ shooter:{places:[["Jeu","une seule place : lobby, champ de tir et cartes dans la même place"]],max:[16],why:"Un seul serveur gère le lobby et les matchs : plus simple, et les joueurs restent ensemble."},
+ rp:{places:[["Ville","une seule grande place"]],max:[30],why:"Un roleplay a besoin de beaucoup de joueurs dans le même monde."},
+ default:{places:[["Jeu","une seule place qui contient tout le jeu"]],max:[8],why:"Tout se passe dans le même monde : une seule place suffit, inutile d'en créer d'autres."}
+};
+const MAXP={steal:8,stat:12,collect:10,throwfeed:10,fashion:16,build:10,tycoon:8,arena:16,sport:12,obby:20,fish:12};
+function structOf(k){const st=STRUCT[k]||{...STRUCT.default,max:[MAXP[k]||10]};return st}
+function prepSteps(I){
+  const k=I.loop.k,st=structOf(k),LD=LOOP_DESIGN[k],multi=st.places.length>1;
+  const placesTxt=st.places.map(([n,r],i)=>`<b>${esc(n)}</b> (max ${st.max[i]??st.max[0]} joueurs) : ${esc(r)}`).join("<br>");
+  return [
+   ["Logiciels","Installe Roblox Studio et Blender","Roblox Studio (gratuit, depuis create.roblox.com) et Blender (gratuit, depuis blender.org). Installe aussi l'app Roblox sur ton téléphone pour tester."],
+   ["Logiciels","Vérifie ton compte Roblox","Ajoute et vérifie ton adresse e-mail dans les paramètres Roblox : c'est nécessaire pour publier et gérer une expérience."],
+   ["Expérience","Crée un groupe Roblox (conseillé)","Crée un groupe pour ton studio : l'expérience lui appartiendra, tu pourras ajouter des collaborateurs et donner une récompense aux membres. Le groupe coûte des Robux à créer : tu peux aussi publier depuis ton compte et transférer plus tard."],
+   ["Expérience",`Crée l'expérience « ${I.title} »`,"Dans Roblox Studio : nouvelle place (Baseplate), puis Fichier → Publier sur Roblox. Laisse-la en privé pendant le développement."],
+   ["Expérience",multi?`Crée ${st.places.length} places dans l'expérience`:"Garde une seule place",`${placesTxt}<br><span class="src">${esc(st.why)}${multi?" Pour ajouter une place : dans Studio, fenêtre Asset Manager → Places → clic droit → Ajouter une place, ou dans le Creator Hub → ton expérience → Places. Note l'ID de chaque place (PlaceId) pour le programmeur serveur.":""}</span>`],
+   ["Expérience","Règle le nombre de joueurs par serveur",`Creator Hub → ton expérience → Places → ${multi?"chaque place":"ta place"} → Max players : ${st.places.map(([n],i)=>`${n} = ${st.max[i]??st.max[0]}`).join(", ")}.`],
+   ["Réglages","Active l'accès aux services API dans Studio","Studio → Paramètres du jeu (Game Settings) → Sécurité → active « Enable Studio Access to API Services ». Sinon la sauvegarde (DataStore) ne marche pas pendant les tests."],
+   ["Réglages",multi?"Autorise la téléportation entre les places":"Choisis les appareils",multi?"Les places d'une même expérience peuvent se téléporter entre elles avec TeleportService, mais les téléportations ne marchent pas dans Studio : il faudra tester sur un serveur publié.":"Paramètres du jeu → Basic Info → coche Téléphone, Tablette, Ordinateur (et Console si tu le veux)."],
+   ["Réglages","Active la collaboration si tu n'es pas seul","Fichier → Collaborer (Team Create) pour travailler à plusieurs sur la même place, puis invite les autres personnes."],
+   ["Monétisation","Crée les game passes et produits",`Creator Hub → ton expérience → Monétisation : crée ${LD.money.slice(0,3).join(", ")}. Laisse-les « hors vente » au début. Note chaque ID et donne-les au programmeur serveur et à l'agent Économie.`],
+   ["Organisation","Prépare tes dossiers","Un dossier pour le projet avec : Blender (fichiers .blend), Exports (FBX), Sons (tableau des IDs trouvés dans la bibliothèque Roblox), Docs (le résultat de chaque agent)."],
+   ["Organisation","Un document pour coller les réponses des agents","Garde au même endroit la réponse de chaque agent : tu devras les recoller aux agents suivants (guide du DA → modélisateur, level designer, interface ; chiffres du game designer → programmeurs et économie)."],
+   ["Avant la sortie","Remplis le questionnaire de maturité","Creator Hub → ton expérience → Questionnaire (Maturity & Compliance). Roblox le demande avant qu'une expérience soit publique."],
+   ["Avant la sortie","Icône, miniatures et page du jeu","Importe l'icône (512×512) et les miniatures (1920×1080) préparées avec le DA, puis colle le titre et la description de l'agent Lancement."],
+   ["Avant la sortie","Teste sur ton téléphone puis passe en public","Joue sur le serveur publié depuis ton téléphone avec un ami, vérifie la sauvegarde et les achats en mode test, puis passe l'expérience en public."]
+  ];
+}
+function prepHTML(I){
+  const key="labo-prep-"+I.title,done=store.get(key)||[],steps=prepSteps(I),st=structOf(I.loop.k);
+  let lastG="";
+  return `<div class="card" id="prepCard"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3>Ce que tu dois préparer avant de lancer les agents</h3><span class="src" id="prepCount">${done.length}/${steps.length} fait</span></div>
+   <div class="note" style="margin:0"><b>Structure du jeu :</b> ${st.places.length} place${st.places.length>1?"s":""} — ${st.places.map(([n])=>esc(n)).join(" + ")}. ${esc(st.why)}</div>
+   <div class="grid" style="gap:4px">${steps.map(([g,t,d],i)=>{const h=g!==lastG?`<div class="stamp" style="margin-top:8px">${esc(g)}</div>`:"";lastG=g;
+     return `${h}<label class="prep" for="prep${i}" style="display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer"><input type="checkbox" id="prep${i}" data-prep="${i}" ${done.includes(i)?"checked":""} style="margin-top:3px;accent-color:var(--accent)"><span><b>${esc(t)}</b><br><span class="src" style="font-size:13px">${d}</span></span></label>`}).join("")}</div></div>`;
+}
+function wirePrep(I){const key="labo-prep-"+I.title,n=prepSteps(I).length;
+  document.querySelectorAll("[data-prep]").forEach(c=>c.onchange=()=>{const d=[...document.querySelectorAll("[data-prep]:checked")].map(x=>+x.dataset.prep);store.set(key,d);$("#prepCount").textContent=`${d.length}/${n} fait`})}
 function renderPlan(){
   const el=$("#planOut");const I=currentChosen();
   if(!I){el.innerHTML=`<div class="note">Aucune idée choisie pour l'instant. Va dans <a href="#idees">Idées de jeux</a> ou <a href="#mon-idee">Mon idée</a> et appuie sur « Choisir ».</div>`;return}
@@ -508,6 +552,7 @@ function renderPlan(){
   el.innerHTML=`<div class="idea"><span class="stamp">Idée choisie · ${esc(gname(I.genre))} · ${esc(LOOPS[I.loop.k].name)} · ${esc(I.T.label)}</span>
     <div class="title">${esc(I.title)}</div><p class="pitch">${esc(pitchOf(I))}</p>
     <div class="src">Potentiel ${I.score}/100 · ${projectSize(I.loop.k)}</div></div>
+   ${prepHTML(I)}
    <div class="card"><h3>Comment utiliser ce plan</h3>
     <ol class="list"><li>Ouvre une conversation séparée pour chaque agent (une par rôle), par exemple avec Claude.</li>
     <li>Copie le prompt de l'agent et colle-le. Chaque prompt contient déjà tout le brief du jeu.</li>
@@ -523,6 +568,7 @@ function renderPlan(){
    <div class="card"><h3>Ajouter un agent</h3><p class="src" style="margin:0">Besoin d'un rôle en plus (animateur, scénariste, traducteur…) ? Écris-le ici et le site prépare son prompt avec le brief.</p>
     <div class="controls"><label for="extraRole">Rôle <input type="text" id="extraRole" placeholder="ex. animateur des personnages"></label><label for="extraTask" style="flex:1;min-width:220px">Ce qu'il doit faire <input type="text" id="extraTask" style="width:100%" placeholder="ex. les animations de marche, d'attaque et de victoire"></label><button id="extraGo">Créer le prompt</button></div>
     <div id="extraOut"></div></div>`;
+  wirePrep(I);
   const msg=t=>{$("#planMsg").textContent=t};
   const copy=async(txt,m)=>{try{await navigator.clipboard.writeText(txt);msg(m)}catch{msg("Le navigateur a bloqué la copie : ouvre « Voir le prompt » et sélectionne le texte.")}};
   $("#copyAll").onclick=()=>copy(AG.map((a,i)=>`===== AGENT ${i+1} · ${a.name} (${a.phase}) =====\n\n${a.prompt}`).join("\n\n\n"),"Les "+AG.length+" prompts sont copiés.");
