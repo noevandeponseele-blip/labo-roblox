@@ -1,12 +1,12 @@
 import json,subprocess,uuid,time,os,datetime
 from concurrent.futures import ThreadPoolExecutor
 def get(u):
-    for i in range(3):
+    for i in range(5):
         try:
             d=json.loads(subprocess.run(["curl","-sS","-m","25",u],capture_output=True,text=True).stdout)
             if not (isinstance(d,dict) and d.get("errors")): return d
         except Exception: pass
-        time.sleep(1.5*(i+1))
+        time.sleep(2*(i+1))
     return {}
 S=str(uuid.uuid4());E="https://apis.roblox.com/explore-api/v1/get-sorts?sessionId="+S
 f={x["filterId"]:[o["optionId"] for o in x["filterOptions"]] for x in get(E+"&device=computer&country=all")["sorts"][0]["filters"]}
@@ -15,8 +15,18 @@ C=[c for c in P if c in f["country_filter_v3"]]
 K=[(d,c) for c in C for d in (["all","computer","high_end_phone","low_end_phone","high_end_tablet","console"] if c in P[:30] else ["all"])]
 code={"top-trending":"T","up-and-coming":"U","top-playing-now":"P","fun-with-friends":"F","top-revisited":"R"}
 seen={}
-with ThreadPoolExecutor(6) as ex:
-    for res in ex.map(lambda k:get(E+"&device=%s&country=%s"%k),K):
+def crawl(k):
+    time.sleep(0.15)
+    return get(E+"&device=%s&country=%s"%k)
+with ThreadPoolExecutor(3) as ex:
+    results=list(ex.map(crawl,K))
+missing=[k for k,r in zip(K,results) if not r.get("sorts")]
+for k in missing:  # deuxième passage, lentement, pour les classements refusés
+    time.sleep(1)
+    results.append(get(E+"&device=%s&country=%s"%k))
+print("classements:",len(K),"| refusés au 1er passage:",len(missing))
+if True:
+    for res in results:
         for s in res.get("sorts",[]):
             for g in s.get("games") or []:
                 e=seen.setdefault(g["universeId"],{"g":g.get("genreL1") or "","s":set()})
@@ -24,7 +34,7 @@ with ThreadPoolExecutor(6) as ex:
                 if not e["g"]: e["g"]=g.get("genreL1") or ""
 ids=list(seen);ch=[ids[i:i+50] for i in range(0,len(ids),50)]
 det,vot={},{}
-with ThreadPoolExecutor(4) as ex:
+with ThreadPoolExecutor(3) as ex:
     for d in ex.map(lambda c:get("https://games.roblox.com/v1/games?universeIds="+",".join(map(str,c))).get("data",[]),ch):
         for g in d: det[g["id"]]=g
     for d in ex.map(lambda c:get("https://games.roblox.com/v1/games/votes?universeIds="+",".join(map(str,c))).get("data",[]),ch):
