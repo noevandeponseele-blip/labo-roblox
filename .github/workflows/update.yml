@@ -1,0 +1,51 @@
+name: Mise à jour du top 1000
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # toutes les heures (heure UTC)
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Récupérer le top 1000 chez Roblox
+        run: |
+          cp data/data.json /tmp/previous.json
+          python3 scripts/update.py | tee /tmp/out.txt
+          COUNT=$(python3 -c "import json;print(len(json.load(open('data/data.json'))['games']))")
+          if [ "$COUNT" -lt 900 ]; then
+            echo "Seulement $COUNT jeux : on garde les données précédentes."
+            cp /tmp/previous.json data/data.json
+          fi
+      - name: Préparer le site
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp data/data.json _site/data/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
