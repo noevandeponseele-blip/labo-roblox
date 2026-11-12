@@ -46,6 +46,27 @@ for i,g in det.items():
       "g":seen[i]["g"],"p":g.get("playing") or 0,"v":g.get("visits") or 0,"f":g.get("favoritedCount") or 0,
       "r":round(u/(u+dn)*100,1) if u+dn else None,"cr":(g.get("created") or "")[:10],"u":(g.get("updated") or "")[:10],"s":"".join(sorted(seen[i]["s"]))})
 out.sort(key=lambda x:-x["p"])
+# miniatures et icônes du top 1000 (pour le créateur de miniatures)
+top_ids=[g["i"] for g in out[:1000]];tc=[top_ids[i:i+50] for i in range(0,len(top_ids),50)]
+TH,IC={},{}
+def th(c):
+    return get("https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds="+",".join(map(str,c))+"&countPerUniverse=1&defaults=true&size=768x432&format=Png&isCircular=false").get("data",[])
+def ic(c):
+    return get("https://thumbnails.roblox.com/v1/games/icons?universeIds="+",".join(map(str,c))+"&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false").get("data",[])
+try:
+    with ThreadPoolExecutor(3) as ex:
+        for d in ex.map(th,tc):
+            for x in d:
+                t=(x.get("thumbnails") or [{}])[0]
+                if t.get("state")=="Completed" and t.get("imageUrl"): TH[x.get("universeId")]=t["imageUrl"]
+        for d in ex.map(ic,tc):
+            for x in d:
+                if x.get("state")=="Completed" and x.get("imageUrl"): IC[x.get("targetId")]=x["imageUrl"]
+except Exception as e: print("miniatures indisponibles:",e)
+for g in out[:1000]:
+    if g["i"] in TH: g["t"]=TH[g["i"]]
+    if g["i"] in IC: g["ic"]=IC[g["i"]]
+print("miniatures:",len(TH),"icônes:",len(IC))
 os.makedirs("data",exist_ok=True)
 more=[[g["n"],g["pl"],g["p"]] for g in out[1000:]]
 json.dump({"fetched":datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="minutes"),"pool":len(out),"games":out[:1000],"more":more},open("data/data.json","w"),ensure_ascii=False,separators=(",",":"))
