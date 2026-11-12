@@ -34,7 +34,7 @@ jobs:
       - name: Préparer le site
         run: |
           mkdir -p _site/data
-          cp index.html plan.js thumbs.js _site/
+          cp index.html app.js plan.js thumbs.js _site/
           cp data/data.json _site/data/
       - uses: actions/upload-pages-artifact@v3
         with:
