@@ -3,6 +3,7 @@ name: Mise à jour du top 1000
 on:
   schedule:
     - cron: "17 * * * *"   # toutes les heures (heure UTC)
+    - cron: "47 * * * *"   # deuxième créneau : GitHub saute souvent des exécutions
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -24,12 +25,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Récupérer le top 1000 chez Roblox
         run: |
-          cp data/data.json /tmp/previous.json
+          # données de secours : la dernière version en ligne, sinon celle du dépôt
+          curl -sf -m 30 "https://noevandeponseele-blip.github.io/labo-roblox/data/data.json" -o /tmp/previous.json && python3 -c "import json;json.load(open('/tmp/previous.json'))" || cp data/data.json /tmp/previous.json
           python3 scripts/update.py | tee /tmp/out.txt
           COUNT=$(python3 -c "import json;print(len(json.load(open('data/data.json'))['games']))")
           if [ "$COUNT" -lt 900 ]; then
-            echo "Seulement $COUNT jeux : on garde les données précédentes."
+            echo "::warning title=Relevé incomplet::Seulement $COUNT jeux récupérés, on garde les données précédentes."
             cp /tmp/previous.json data/data.json
+          else
+            python3 -c "import json;d=json.load(open('data/data.json'));g=d['games'];print('::notice title=Relevé OK::date=%s jeux=%d candidats=%d miniatures=%d n1=%s (%d joueurs)'%(d['fetched'],len(g),d['pool'],sum(1 for x in g if x.get('t')),g[0]['n'][:40],g[0]['p']))"
           fi
       - name: Préparer le site
         run: |

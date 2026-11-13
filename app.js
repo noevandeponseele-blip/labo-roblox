@@ -250,7 +250,7 @@ function renderIdeasSetup(){
   renderSaved();
 }
 function makeIdea(){let close=null,last=null;
-  for(let i=0;i<12;i++){const I=makeIdeaRaw();I.orig=originality(I);last=I;if(I.orig.level==="original")return I;if(I.orig.level==="close"&&!close)close=I}
+  for(let i=0;i<12;i++){const I=makeIdeaRaw();I.orig=typeof originality==="function"?originality(I):{level:"original",matches:[],checked:0};last=I;if(I.orig.level==="original")return I;if(I.orig.level==="close"&&!close)close=I}
   return close||last}
 function makeIdeaRaw(){
   const size=$("#iSize").value,gf=$("#iGenre").value,tf=$("#iTheme").value;
@@ -314,5 +314,6 @@ bars($("#searchCats"),[["Mots de genre",34],["Noms de jeux",28],["Verbes d'actio
 const VIEWS=["apercu","percees","genres","mots-cles","recettes","jeux","idees","mon-idee","plan","miniatures"];
 function route(){if(!D)return;const h=location.hash.slice(1);const v=VIEWS.includes(h)?h:"apercu";VIEWS.forEach(x=>$("#v-"+x).classList.toggle("on",x===v));document.querySelectorAll("nav.tabs a").forEach(a=>{if(a.getAttribute("href")==="#"+v){a.setAttribute("aria-current","page");const n=a.parentElement;n.scrollTo({left:a.offsetLeft-n.clientWidth/2+a.clientWidth/2,behavior:"smooth"})}else a.removeAttribute("aria-current")})}
 addEventListener("hashchange",()=>{route();scrollTo({top:0})});
-load();
+/* on attend que tous les fichiers du site soient chargés avant de traiter les données */
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>load());else load();
 setInterval(()=>{if(document.visibilityState==="visible")load()},20*60*1000);
